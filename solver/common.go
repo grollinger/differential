@@ -2,9 +2,11 @@ package solver
 
 import "math"
 
-type Function func(float64, []float64, []float64)
+//
+type Function func(t float64, y []float64, dy_out []float64)
 
 type parameters struct {
+	name          string
 	stages, order uint
 	//misc params
 	maxsteps               int

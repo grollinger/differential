@@ -3,23 +3,27 @@ package solver
 import "errors"
 
 const (
-	RK2    = RKMethod(iota) // RK2(3)
-	RKFB4                   // RKFB4(5)
-	DoPri5                  // DoPri5(4)
+	RK2               = RKMethod(iota) // RK2(3)
+	RKFB4                              // RKFB4(5)
+	DoPri5                             // DoPri5(4)
+	NumberOfRKMethods = uint(iota)
 )
 
 func NewRK(m RKMethod) (r rk, err error) {
 	switch m {
 	case RK2:
 		r.stages, r.order = 3, 3
+		r.name = "RK2"
 		makeCoeffs(&r)
 		setCoeffsRK2(&r)
 	case RKFB4:
 		r.stages, r.order = 6, 4
+		r.name = "RKFB4"
 		makeCoeffs(&r)
 		setCoeffsRKFB4(&r)
 	case DoPri5:
 		r.stages, r.order = 7, 5
+		r.name = "DoPri5"
 		r.firstStageAsLast = true
 		makeCoeffs(&r)
 		setCoeffsDoPri5(&r)

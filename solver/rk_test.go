@@ -1,10 +1,93 @@
 package solver
 
-import "testing"
+import (
+	"math"
+	"math/rand"
+	"testing"
+)
 
-func TestRK2(t *testing.T) {
-	_, err := NewRK(RK2)
-	if err != nil {
-		t.Errorf(err.Error())
+type solution func(float64) []float64
+
+// x^2 + C
+func order2(t float64) []float64 {
+	return []float64{t * t}
+}
+func order2Deriv(t float64, y []float64, dy []float64) {
+	dy[0] = 2 * t
+}
+
+// 10*x^3+ PI * x^2 +142 * x + 10
+func order3(t float64) []float64 {
+	return []float64{10*math.Pow(t, 3) + math.Pi*math.Pow(t, 2) + 142*t + 10}
+}
+func order3Deriv(t float64, y []float64, dy []float64) {
+	dy[0] = 30*math.Pow(t, 2) + 2*math.Pi*t + 142
+}
+
+type IntegrationTest struct {
+	tMin, tMax float64
+	sol        solution
+	fcn        Function
+	order      uint
+	name       string
+}
+
+var integrationTests = []IntegrationTest{
+	{-100, 100, order2, order2Deriv, 2, "x^2"},
+	{-100, 100, order3, order3Deriv, 2, "x^3"},
+}
+
+func randomInInterval(low, high float64) float64 {
+	return low + (rand.Float64() * (high - low))
+}
+
+func epsEqual(a, b, eps float64) bool {
+	return math.Abs(a-b) < eps
+}
+
+func TestRK(t *testing.T) {
+	eps := 0.0001
+	testsPerCase := 10
+
+	var m uint
+	for m = 0; m < NumberOfRKMethods; m++ {
+		rk, err := NewRK(RKMethod(m))
+
+		if err != nil {
+			t.Errorf("Error Creating RKMethod %d - %s", m, err.Error())
+			continue
+		}
+		if testing.Verbose() {
+			t.Logf("%s\tTest\tT0\tTE\tSteps\tReject\tEval\tLast h\tY Expected\tY Result", rk.name)
+		}
+
+		for _, v := range integrationTests {
+			if v.order <= rk.order {
+				for i := 0; i < testsPerCase; i++ {
+					t0 := randomInInterval(v.tMin, v.tMax)
+					te := randomInInterval(t0, v.tMax)
+					y := v.sol(t0)
+					ye := v.sol(te)
+
+					stat, err := rk.Integrate(-1, t0, te, y, v.fcn)
+
+					if stat.CurrentTime != te {
+						t.Errorf("Tried to integrate up to %f but only reached %f", te, stat.CurrentTime)
+					}
+					if !epsEqual(y[0], ye[0], eps) {
+						t.Errorf("Expected %f but result was %f", ye[0], y[0])
+					}
+					if err != nil {
+						t.Errorf("rk: Error: %s", err.Error())
+					} else if testing.Verbose() {
+						t.Logf(" \t%s\t%.2f\t%.2f\t%d\t%d\t%d\t%.2f\t%f\t%f",
+							v.name, t0, te, stat.StepCount, stat.RejectedCount, stat.EvaluationCount, stat.LastStepSize,
+							ye[0], y[0])
+					}
+				}
+			} else {
+				t.Logf("Skipped Test %s for RKMethod %s, order too high", v.name, rk.name)
+			}
+		}
 	}
 }
