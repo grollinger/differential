@@ -8,17 +8,18 @@ import (
 type PeerMethod uint
 
 const (
-	EPP2       = PeerMethod(2)
-	EPP4       = PeerMethod(4)
-	EPP4y2     = PeerMethod(14)
-	EPP4y3     = PeerMethod(24)
-	EPP4_06809 = PeerMethod(34)
-	EPP6p1     = PeerMethod(6)
-	EPP6j1     = PeerMethod(16)
-	EPP8_d     = PeerMethod(8)
-	EPP8sp8    = PeerMethod(18)
-	EPP_x1     = PeerMethod(28) // absc=-0.524, B-norm=0.35*8
-	EPP_x2     = PeerMethod(38) // absc=-0.466, efc=0, B-norm=0.35*8 /20061101
+	EPP2 = PeerMethod(iota)
+	EPP4
+	EPP4y2
+	EPP4y3
+	EPP4_06809
+	EPP6p1
+	EPP6j1
+	EPP8_d
+	EPP8sp8
+	EPP_x1
+	EPP_x2
+	NumberOfPeerMethods = uint(iota)
 )
 
 func NewPeer(m PeerMethod) (p peer, err error) {
@@ -59,31 +60,55 @@ func vanderMonde(pc []float64, pm [][]float64) {
 }
 
 func (p *peer) setCoeffs() (err error) {
-	p.stages = stagesOf(p.method)
-	p.allocateCoeffs(p.stages)
-
 	switch p.method {
 	case EPP2:
+		p.order, p.stages, p.sigx = 4, 2, 1.5
+		p.name = "EPP2"
+		p.allocateCoeffs()
 		p.setEPP2Coeffs()
 	case EPP4:
+		p.order, p.stages, p.sigx = 4, 4, 1.4
+		p.name = "EPP4"
 		p.setEPP4Coeffs()
 	case EPP4y2:
+		p.order, p.stages, p.sigx = 4, 4, 1.6
+		p.name = "EPP4y2"
 		p.setEPP4y2Coeffs()
 	case EPP4y3:
+		p.order, p.stages, p.sigx = 4, 4, 1.6
+		p.ema = 0.3125
+		p.name = "EPPy3"
 		p.setEPP4y3Coeffs()
 	case EPP4_06809:
+		p.order, p.stages, p.sigx = 4, 4, 1.6
+		p.name = "EPP4_06809"
 		p.setEPP4_06809Coeffs()
 	case EPP6p1:
+		p.order, p.stages, p.sigx = 6, 6, 1.5
+		p.ema = 0.125
+		p.name = "EPP6p1"
 		p.setEPP6p1Coeffs()
 	case EPP6j1:
+		p.order, p.stages, p.sigx = 6, 6, 1.5
+		p.ema = 0.125
+		p.name = "EPP6j1"
 		p.setEPP6j1Coeffs()
 	case EPP8_d:
+		p.order, p.stages, p.sigx = 8, 8, 1.4
+		p.name = "EPP8_d"
 		p.setEPP8_dCoeffs()
 	case EPP8sp8:
+		p.order, p.stages, p.sigx = 8, 8, 1.4
+		p.name = "EPP8sp8"
 		p.setEPP8sp8Coeffs()
-	case EPP_x1:
+	case EPP_x1: // absc=-0.524, B-norm=0.35*8
+		p.order, p.stages, p.sigx = 8, 8, 1.4
+		p.name = "EPP_x1"
 		p.setEPP_x1Coeffs()
-	case EPP_x2:
+	case EPP_x2: // absc=-0.466, efc=0, B-norm=0.35*8 /20061101
+		p.order, p.stages, p.sigx = 8, 8, 1.4
+		p.ema = 1.0 // interval [0.2,2]
+		p.name = "EPP_x2"
 		p.setEPP_x2Coeffs()
 	default:
 		err = errors.New("unknown peer method")
@@ -202,7 +227,7 @@ func (p *peer) findMinMaxNodes() {
 	}
 }
 
-func (p *peer) allocateCoeffs(stages uint) {
+func (p *peer) allocateCoeffs() {
 	p.c, p.e = make([]float64, p.stages), make([]float64, p.stages)
 	p.b = makeSquare(p.stages)
 	p.a0 = makeSquare(p.stages)
@@ -211,8 +236,7 @@ func (p *peer) allocateCoeffs(stages uint) {
 }
 
 func (p *peer) setEPP2Coeffs() {
-	p.order = 4 // stages = 2
-	p.sigx = 1.5
+
 	// p.ema = 0.0
 
 	p.c[0] = -1.0
@@ -225,8 +249,6 @@ func (p *peer) setEPP2Coeffs() {
 }
 
 func (p *peer) setEPP4Coeffs() {
-	p.order = 4 // stages = 4
-	p.sigx = 1.4
 	// p.ema = 0.0
 
 	p.c[0] = -1.0
@@ -253,8 +275,6 @@ func (p *peer) setEPP4Coeffs() {
 }
 
 func (p *peer) setEPP4y2Coeffs() {
-	p.order = 4 // stages = 4
-	p.sigx = 1.6
 	// p.ema = 0.0
 
 	p.c[0] = 0.44856672599000208
@@ -281,9 +301,6 @@ func (p *peer) setEPP4y2Coeffs() {
 }
 
 func (p *peer) setEPP4y3Coeffs() {
-	p.order = 4 // stages = 4
-	p.sigx = 1.6
-	p.ema = 0.3125
 
 	p.c[0] = 1.33880820864483004
 	p.c[1] = 1.70380840062134099
@@ -308,9 +325,6 @@ func (p *peer) setEPP4y3Coeffs() {
 	p.b[3][3] = 1.0
 }
 func (p *peer) setEPP4_06809Coeffs() {
-	p.order = 4 // stages = 4
-	p.sigx = 1.6
-	// p.ema = 0.0
 
 	p.c[0] = -1.067193866512852
 	p.c[1] = -2.756684444690223e-1
@@ -336,9 +350,6 @@ func (p *peer) setEPP4_06809Coeffs() {
 }
 
 func (p *peer) setEPP6p1Coeffs() {
-	p.order = 6 // stages = 6
-	p.sigx = 1.5
-	p.ema = 0.125
 
 	p.c[0] = -1.31059599683912621
 	p.c[1] = 1.97665537290660046
@@ -385,9 +396,6 @@ func (p *peer) setEPP6p1Coeffs() {
 	p.b[5][5] = 1.0
 }
 func (p *peer) setEPP6j1Coeffs() {
-	p.order = 6 // stages = 6
-	p.sigx = 1.5
-	p.ema = 0.125
 
 	p.c[0] = 6.1182488158460324e-1
 	p.c[1] = 1.0734784354567433
@@ -434,10 +442,6 @@ func (p *peer) setEPP6j1Coeffs() {
 	p.b[5][5] = 1.0
 }
 func (p *peer) setEPP8_dCoeffs() {
-	p.order = 8
-	p.sigx = 1.4
-	// p.ema = 0.0
-
 	p.c[0] = 0.26041740957753135
 	p.c[1] = 0.52923626823623069
 	p.c[2] = 1.54653689839871537
@@ -513,10 +517,6 @@ func (p *peer) setEPP8_dCoeffs() {
 	p.b[7][7] = 1.00013131148573434
 }
 func (p *peer) setEPP8sp8Coeffs() {
-	p.order = 8
-	p.sigx = 1.4
-	// p.ema = 0.0
-
 	p.c[0] = 0.70541387781778147
 	p.c[1] = 1.30641486071640562
 	p.c[2] = 0.31760983680370311
@@ -592,10 +592,6 @@ func (p *peer) setEPP8sp8Coeffs() {
 	p.b[7][7] = 1.14012130048174894
 }
 func (p *peer) setEPP_x1Coeffs() {
-	p.order = 8
-	p.sigx = 1.4
-	// p.ema = 0.0
-
 	p.c[0] = -1.020253410235809
 	p.c[1] = -7.973369854084624e-1
 	p.c[2] = -5.523527869930042e-1
@@ -672,9 +668,6 @@ func (p *peer) setEPP_x1Coeffs() {
 	p.b[7][7] = 1.368588234988504e-3
 }
 func (p *peer) setEPP_x2Coeffs() {
-	p.order = 8
-	p.sigx = 1.4
-	p.ema = 1.0 // interval [0.2,2]
 
 	p.c[0] = -1.514542417302030
 	p.c[1] = -1.003995798476134
