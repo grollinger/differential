@@ -24,6 +24,14 @@ func order3Deriv(t float64, y []float64, dy []float64) {
 	dy[0] = 30*math.Pow(t, 2) + 2*math.Pi*t + 142
 }
 
+// 83.23454 * x^4 + 42.4543*x^3+ E * x^2
+func order4(t float64) []float64 {
+	return []float64{83.23454*math.Pow(t, 4) + 42.4543*math.Pow(t, 3) + math.E*math.Pow(t, 2)}
+}
+func order4Deriv(t float64, y []float64, dy []float64) {
+	dy[0] = 4*83.23454*math.Pow(t, 3) + 3*42.4543*math.Pow(t, 2) + 2*math.E*t
+}
+
 type IntegrationTest struct {
 	tMin, tMax float64
 	sol        solution
@@ -34,7 +42,8 @@ type IntegrationTest struct {
 
 var integrationTests = []IntegrationTest{
 	{-100, 100, order2, order2Deriv, 2, "x^2"},
-	{-100, 100, order3, order3Deriv, 2, "x^3"},
+	{-100, 100, order3, order3Deriv, 3, "x^3"},
+	{-100, 100, order4, order4Deriv, 4, "x^4"},
 }
 
 func randomInInterval(low, high float64) float64 {
@@ -58,7 +67,7 @@ func TestRK(t *testing.T) {
 			continue
 		}
 		if testing.Verbose() {
-			t.Logf("%s\tTest\tT0\tTE\tSteps\tReject\tEval\tLast h\tY Expected\tY Result", rk.name)
+			t.Logf("%s\tTest\tT0\tTE\tSteps\tReject\tEval\tLast h", rk.name)
 		}
 
 		for _, v := range integrationTests {
@@ -71,18 +80,18 @@ func TestRK(t *testing.T) {
 
 					stat, err := rk.Integrate(-1, t0, te, y, v.fcn)
 
-					if stat.CurrentTime != te {
+					if !epsEqual(stat.CurrentTime, te, eps) {
 						t.Errorf("Tried to integrate up to %f but only reached %f", te, stat.CurrentTime)
 					}
 					if !epsEqual(y[0], ye[0], eps) {
 						t.Errorf("Expected %f but result was %f", ye[0], y[0])
 					}
 					if err != nil {
-						t.Errorf("rk: Error: %s", err.Error())
-					} else if testing.Verbose() {
-						t.Logf(" \t%s\t%.2f\t%.2f\t%d\t%d\t%d\t%.2f\t%f\t%f",
-							v.name, t0, te, stat.StepCount, stat.RejectedCount, stat.EvaluationCount, stat.LastStepSize,
-							ye[0], y[0])
+						t.Errorf("Error: %s", err.Error())
+					}
+					if testing.Verbose() {
+						t.Logf(" \t%s\t%.2f\t%.2f\t%d\t%d\t%d\t%.2f",
+							v.name, t0, te, stat.StepCount, stat.RejectedCount, stat.EvaluationCount, stat.LastStepSize)
 					}
 				}
 			} else {
