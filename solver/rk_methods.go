@@ -9,7 +9,8 @@ const (
 	NumberOfRKMethods = uint(iota)
 )
 
-func NewRK(m RKMethod) (r rk, err error) {
+func NewRK(m RKMethod) (i Integrator, err error) {
+	var r rk
 	switch m {
 	case RK2:
 		r.stages, r.order = 3, 3
@@ -32,13 +33,7 @@ func NewRK(m RKMethod) (r rk, err error) {
 		err = errors.New("unknown rk method")
 	}
 
-	if err == nil {
-		// set default parameters
-		r.maxsteps = 1000000
-		r.hmin = 1e-10
-		r.atol = 1e-4
-		r.rtol = r.atol
-	}
+	i = &r
 	return
 }
 

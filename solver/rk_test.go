@@ -61,24 +61,25 @@ func TestRK(t *testing.T) {
 	var m uint
 	for m = 0; m < NumberOfRKMethods; m++ {
 		rk, err := NewRK(RKMethod(m))
+		info := rk.Info()
 
 		if err != nil {
 			t.Errorf("Error Creating RKMethod %d - %s", m, err.Error())
 			continue
 		}
 		if testing.Verbose() {
-			t.Logf("%s\tTest\tT0\tTE\tSteps\tReject\tEval\tLast h", rk.name)
+			t.Logf("%s\tTest\tT0\tTE\tSteps\tReject\tEval\tLast h", info.name)
 		}
 
 		for _, v := range integrationTests {
-			if v.order <= rk.order {
+			if v.order <= info.order {
 				for i := 0; i < testsPerCase; i++ {
 					t0 := randomInInterval(v.tMin, v.tMax)
 					te := randomInInterval(t0, v.tMax)
 					y := v.sol(t0)
 					ye := v.sol(te)
 
-					stat, err := rk.Integrate(-1, t0, te, y, v.fcn)
+					stat, err := rk.Integrate(t0, te, y, Config{Fcn: v.fcn})
 
 					if !epsEqual(stat.CurrentTime, te, eps) {
 						t.Errorf("Tried to integrate up to %f but only reached %f", te, stat.CurrentTime)
@@ -95,7 +96,7 @@ func TestRK(t *testing.T) {
 					}
 				}
 			} else {
-				t.Logf("Skipped Test %s for RKMethod %s, order too high", v.name, rk.name)
+				t.Logf("Skipped Test %s for RKMethod %s, order too high", v.name, info.name)
 			}
 		}
 	}

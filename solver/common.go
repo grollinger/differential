@@ -2,15 +2,68 @@ package solver
 
 import "math"
 
-//
-type Function func(t float64, y []float64, dy_out []float64)
+type Function func(t float64, yT []float64, dy_out []float64)
 
-type parameters struct {
+type Config struct {
+	// InitialStepSize, if > 0.0 specifies the step size
+	// to be used in the first integration step
+	// Else, the implementation should use a sensible default
+	InitialStepSize float64
+
+	// MinStepSize, if > 0.0 specifies the minimal size of a processing step
+	// processing will abort, if this value could not be reached
+	MinStepSize float64
+
+	// MaxStepSize if > 0.0 specifies the maximum size of a processing step
+	// processing will abort, if this value would be exceeded
+	MaxStepSize float64
+
+	//
+	AbsoluteTolerance float64
+
+	RelativeTolerance float64
+
+	// MaxStepCount if > 0 specifies the maximum number number of steps the Integrator
+	// will take before aborting processing if the target time has not been reached
+	MaxStepCount uint
+
+	// OneStepOnly, if set, causes the Integrator to stop processing
+	// after the first integration step was performed
+	OneStepOnly bool
+
+	// Fcn contains the expression that should be evaluated for
+	// the right hand side of the differential equation
+	// yT'(t) = Fcn(t, yT(t))
+	Fcn Function
+}
+
+type Statistics struct {
+	// StepCount contains the number of steps the Integrator performed to calculate the
+	StepCount uint
+	// RejectedCount is the number of steps the Integrator rejected during processing
+	RejectedCount uint
+	// EvaluationCount is the number of times the right hand side expression
+	// of the differential equation was evaluated during processing
+	EvaluationCount uint
+
+	// LastStepSize is the size of the last integration step performed
+	LastStepSize float64
+	// CurrentTime is the value of t up to which the integration was performed
+	CurrentTime float64
+}
+
+type Integrator interface {
+	Info() IntegratorInfo
+	Integrate(t, tEnd float64, yT []float64, config Config) (stat Statistics, err error)
+}
+
+type IntegratorInfo struct {
 	name          string
 	stages, order uint
-	//misc params
-	maxsteps               int
-	hmin, hmax, atol, rtol float64
+}
+
+func (i *IntegratorInfo) Info() IntegratorInfo {
+	return *i
 }
 
 func makeSquare(n uint) [][]float64 {
@@ -27,19 +80,19 @@ func makeRectangular(rows, cols uint) (rect [][]float64) {
 	return
 }
 
-func estimateStepsize(t float64, y, fv1 []float64, fcn Function, p parameters) float64 {
-	n := len(y)
-	var h, h1, rc, der2, der12 float64
+func estimateStepSize(t float64, yT, fcnValue []float64, c *Config, order uint) float64 {
+	n := len(yT)
+	var h, h1, der2, der12 float64
 
 	// allocate temp arrays
 	y2, f2 := make([]float64, n), make([]float64, n)
 
-	// calculate temp stepsize
+	// calculate temp step size
 	dnf, dny := 0.0, 0.0
 	for id := 0; id < n; id++ {
-		rc = p.atol + p.rtol*math.Abs(y[id])
-		dnf = dnf + math.Pow(fv1[id]/rc, 2)
-		dny = dny + math.Pow(y[id]/rc, 2)
+		rc := c.AbsoluteTolerance + c.RelativeTolerance*math.Abs(yT[id])
+		dnf = dnf + math.Pow(fcnValue[id]/rc, 2)
+		dny = dny + math.Pow(yT[id]/rc, 2)
 	}
 
 	if math.Min(dnf, dny) < 1e-10 {
@@ -47,18 +100,18 @@ func estimateStepsize(t float64, y, fv1 []float64, fcn Function, p parameters) f
 	} else {
 		h = 1.e-2 * math.Sqrt(dny/dnf)
 	}
-	h = math.Min(h, p.hmax)
+	h = math.Min(h, c.MaxStepSize)
 
 	// explicit Euler step
 	for id := 0; id < n; id++ {
-		y2[id] = y[id] + h*fv1[id]
+		y2[id] = yT[id] + h*fcnValue[id]
 	}
-	fcn(t+h, y2, f2)
+	c.Fcn(t+h, y2, f2)
 
 	der2 = 0.0
 	for id := 0; id < n; id++ {
-		rc = p.atol + p.rtol*math.Abs(y[id])
-		der2 = der2 + math.Pow((f2[id]-fv1[id])/rc, 2)
+		rc := c.AbsoluteTolerance + c.RelativeTolerance*math.Abs(yT[id])
+		der2 = der2 + math.Pow((f2[id]-fcnValue[id])/rc, 2)
 	}
 
 	//estimate for second derivative
@@ -69,7 +122,7 @@ func estimateStepsize(t float64, y, fv1 []float64, fcn Function, p parameters) f
 	if der12 <= 1.e-15 {
 		h1 = math.Max(1.e-6, h*1.e-3)
 	} else {
-		h1 = math.Pow(1.e-2/der12, 1.0/float64(p.order))
+		h1 = math.Pow(1.e-2/der12, 1.0/float64(order))
 	}
-	return math.Min(1e2*h, math.Min(h1, p.hmax))
+	return math.Min(1e2*h, math.Min(h1, c.MaxStepSize))
 }

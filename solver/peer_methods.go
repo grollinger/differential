@@ -186,12 +186,6 @@ func (p *peer) setCoeffs() (err error) {
 	// error estimate with last row of PPV
 	copy(p.e, p.pv[p.stages-1])
 
-	// set default parameters
-	p.maxsteps = 1000000
-	p.hmin = 1e-10
-	p.atol = 1e-4
-	p.rtol = p.atol
-
 	return
 }
 
@@ -214,15 +208,15 @@ func (p *peer) ensureOneRowSums() {
 func (p *peer) findMinMaxNodes() {
 	// ! minimal and maximal nodes:
 	p.icmin = 0
-	p.icmax = int(p.stages) - 1
+	p.icmax = uint(p.stages) - 1
 
 	var i uint
 	for i = 0; i < p.stages; i++ {
 		if p.c[i] < p.c[p.icmin] {
-			p.icmin = int(i)
+			p.icmin = i
 		}
 		if p.c[i] > p.c[p.icmax] {
-			p.icmax = int(i)
+			p.icmax = i
 		}
 	}
 }
