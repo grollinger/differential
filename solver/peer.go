@@ -76,6 +76,10 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statisti
 	tc = t
 
 	rkStat, err := dopri.Integrate(tc, t+stepNext, yy[old][p.icmax], rkConfig)
+	if err != nil {
+		err = errors.New("error during startup: " + err.Error())
+		return
+	}
 	stat.EvaluationCount += rkStat.EvaluationCount
 	c.Fcn(tc, yy[old][p.icmax], ff[old][p.icmax])
 	stat.EvaluationCount++
@@ -92,6 +96,10 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statisti
 			hn = h0 * (p.c[stg] - p.c[p.icmin])
 			tStage := t0 + h0*p.c[stg]
 			rkStat, err = dopri.Integrate(t, tStage, yy[old][stg], rkConfig)
+			if err != nil {
+				err = errors.New("error during startup: " + err.Error())
+				return
+			}
 			c.Fcn(tStage, yy[old][stg], ff[old][stg])
 			stat.EvaluationCount += rkStat.EvaluationCount + 1
 		}

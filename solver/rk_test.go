@@ -54,19 +54,44 @@ func epsEqual(a, b, eps float64) bool {
 	return math.Abs(a-b) < eps
 }
 
+func testIntegrators(t *testing.T) (integrators []Integrator) {
+	integrators = make([]Integrator, NumberOfRKMethods+NumberOfPeerMethods)
+	t.Logf("Integrators: %d", NumberOfRKMethods+NumberOfPeerMethods)
+	var i uint = 0
+	for j := 0; j < int(NumberOfRKMethods); j++ {
+		rk, err := NewRK(RKMethod(j))
+		if err != nil {
+			t.Errorf("Couldn't create RK Method %d: %s", j, err.Error())
+		} else {
+			integrators[i] = rk
+		}
+		i++
+	}
+	for j := 0; j < int(NumberOfPeerMethods); j++ {
+		p, err := NewPeer(PeerMethod(j))
+		if err != nil {
+			t.Errorf("Couldn't create Peer Method %d: %s", j, err.Error())
+		} else {
+			integrators[i] = p
+		}
+		t.Logf("Integrators #%d", i)
+		i++
+	}
+	return
+}
+
 func TestRK(t *testing.T) {
 	eps := 0.0001
 	testsPerCase := 10
 
-	var m uint
-	for m = 0; m < NumberOfRKMethods; m++ {
-		rk, err := NewRK(RKMethod(m))
-		info := rk.Info()
-
-		if err != nil {
-			t.Errorf("Error Creating RKMethod %d - %s", m, err.Error())
+	methods := testIntegrators(t)
+	for _, m := range methods {
+		if m == nil {
 			continue
 		}
+
+		info := m.Info()
+
 		if testing.Verbose() {
 			t.Logf("%s\tTest\tT0\tTE\tSteps\tReject\tEval\tLast h", info.name)
 		}
@@ -79,7 +104,7 @@ func TestRK(t *testing.T) {
 					y := v.sol(t0)
 					ye := v.sol(te)
 
-					stat, err := rk.Integrate(t0, te, y, Config{Fcn: v.fcn})
+					stat, err := m.Integrate(t0, te, y, Config{Fcn: v.fcn})
 
 					if !epsEqual(stat.CurrentTime, te, eps) {
 						t.Errorf("Tried to integrate up to %f but only reached %f", te, stat.CurrentTime)

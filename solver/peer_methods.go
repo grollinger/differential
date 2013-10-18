@@ -22,12 +22,15 @@ const (
 	NumberOfPeerMethods = uint(iota)
 )
 
-func NewPeer(m PeerMethod) (p peer, err error) {
+func NewPeer(m PeerMethod) (i Integrator, err error) {
+	var p peer
 	p.method = m
 	err = p.setCoeffs()
 	if err != nil {
 		p = peer{}
 	}
+	i = &p
+
 	return
 }
 
@@ -69,46 +72,56 @@ func (p *peer) setCoeffs() (err error) {
 	case EPP4:
 		p.order, p.stages, p.sigx = 4, 4, 1.4
 		p.name = "EPP4"
+		p.allocateCoeffs()
 		p.setEPP4Coeffs()
 	case EPP4y2:
 		p.order, p.stages, p.sigx = 4, 4, 1.6
 		p.name = "EPP4y2"
+		p.allocateCoeffs()
 		p.setEPP4y2Coeffs()
 	case EPP4y3:
 		p.order, p.stages, p.sigx = 4, 4, 1.6
 		p.ema = 0.3125
 		p.name = "EPPy3"
+		p.allocateCoeffs()
 		p.setEPP4y3Coeffs()
 	case EPP4_06809:
 		p.order, p.stages, p.sigx = 4, 4, 1.6
 		p.name = "EPP4_06809"
+		p.allocateCoeffs()
 		p.setEPP4_06809Coeffs()
 	case EPP6p1:
 		p.order, p.stages, p.sigx = 6, 6, 1.5
 		p.ema = 0.125
 		p.name = "EPP6p1"
+		p.allocateCoeffs()
 		p.setEPP6p1Coeffs()
 	case EPP6j1:
 		p.order, p.stages, p.sigx = 6, 6, 1.5
 		p.ema = 0.125
 		p.name = "EPP6j1"
+		p.allocateCoeffs()
 		p.setEPP6j1Coeffs()
 	case EPP8_d:
 		p.order, p.stages, p.sigx = 8, 8, 1.4
 		p.name = "EPP8_d"
+		p.allocateCoeffs()
 		p.setEPP8_dCoeffs()
 	case EPP8sp8:
 		p.order, p.stages, p.sigx = 8, 8, 1.4
 		p.name = "EPP8sp8"
+		p.allocateCoeffs()
 		p.setEPP8sp8Coeffs()
 	case EPP_x1: // absc=-0.524, B-norm=0.35*8
 		p.order, p.stages, p.sigx = 8, 8, 1.4
 		p.name = "EPP_x1"
+		p.allocateCoeffs()
 		p.setEPP_x1Coeffs()
 	case EPP_x2: // absc=-0.466, efc=0, B-norm=0.35*8 /20061101
 		p.order, p.stages, p.sigx = 8, 8, 1.4
 		p.ema = 1.0 // interval [0.2,2]
 		p.name = "EPP_x2"
+		p.allocateCoeffs()
 		p.setEPP_x2Coeffs()
 	default:
 		err = errors.New("unknown peer method")
