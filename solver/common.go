@@ -48,6 +48,8 @@ type Statistics struct {
 
 	// LastStepSize is the size of the last integration step performed
 	LastStepSize float64
+	// NextStepSize is the size of the next Step the integrator would take
+	NextStepSize float64
 	// CurrentTime is the value of t up to which the integration was performed
 	CurrentTime float64
 }

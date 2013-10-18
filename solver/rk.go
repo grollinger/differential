@@ -52,13 +52,15 @@ func (r *rk) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statistics
 	stat.EvaluationCount = 1
 
 	// compute initial step size if not set
-	stepNext := c.InitialStepSize
-	if stepNext <= 0.0 {
-		stepNext = estimateStepSize(t, yT, fcnValue, &c, r.order)
+	stepEstimate := c.InitialStepSize
+	if stepEstimate <= 0.0 {
+		stepEstimate = estimateStepSize(t, yT, fcnValue, &c, r.order)
 	}
-
+	var stepNext float64
 	// repeat until tend
 	for t < tEnd && err == nil {
+		// Set new step size
+		stepNext = stepEstimate
 
 		stat.StepCount++
 		if t+stepNext > tEnd {
@@ -103,7 +105,7 @@ func (r *rk) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statistics
 		relativeError = math.Sqrt(relativeError / float64(n))
 
 		// new stepsize estimate
-		stepEstimate := 0.9 * math.Exp(-math.Log(1.0e-8+relativeError)/float64(r.order))
+		stepEstimate = 0.9 * math.Exp(-math.Log(1.0e-8+relativeError)/float64(r.order))
 		stepEstimate = stepNext * math.Max(0.2, math.Min(stepEstimate, 2.0)) // safety interval
 
 		// reject step
@@ -113,6 +115,7 @@ func (r *rk) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statistics
 			// report failure, step size too small
 			if stepEstimate < c.MinStepSize {
 				err = errors.New("stepsize too small")
+				break
 			}
 		} else {
 			// accept step and compute new solution
@@ -128,7 +131,7 @@ func (r *rk) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statistics
 
 			// cancel after first step
 			if c.OneStepOnly {
-				return
+				break
 			} else {
 				if r.firstStageAsLast {
 					copy(fcnValue, ks[r.stages-1])
@@ -141,18 +144,13 @@ func (r *rk) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statistics
 		// failure, too many steps
 		if stat.StepCount > c.MaxStepCount {
 			err = errors.New("maximum step count exceeded")
-			return
+			break
 		}
-
-		// Set new step size
-		stepNext = stepEstimate
-
 	}
-
-	// set return code and time
 
 	stat.CurrentTime = t
 	stat.LastStepSize = stepNext
+	stat.NextStepSize = stepEstimate
 
 	return
 
