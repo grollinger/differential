@@ -59,6 +59,11 @@ type Integrator interface {
 	Integrate(t, tEnd float64, yT []float64, config Config) (stat Statistics, err error)
 }
 
+type Problem interface {
+	Initialize() []float64
+	Fcn(t float64, yT []float64, dy_out []float64)
+}
+
 type IntegratorInfo struct {
 	name          string
 	stages, order uint
