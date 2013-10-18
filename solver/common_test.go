@@ -6,6 +6,8 @@ import (
 	"testing"
 )
 
+var iterationsPerTest = 10
+
 type solution func(float64) []float64
 
 // x^2 + C
@@ -52,32 +54,6 @@ func randomInInterval(low, high float64) float64 {
 
 func epsEqual(a, b, eps float64) bool {
 	return math.Abs(a-b) < eps
-}
-
-func allIntegrators(t *testing.T) (integrators []Integrator) {
-	integrators = make([]Integrator, NumberOfRKMethods+NumberOfPeerMethods)
-	t.Logf("Integrators: %d", NumberOfRKMethods+NumberOfPeerMethods)
-	var i uint = 0
-	for j := 0; j < int(NumberOfRKMethods); j++ {
-		rk, err := NewRK(RKMethod(j))
-		if err != nil {
-			t.Errorf("Couldn't create RK Method %d: %s", j, err.Error())
-		} else {
-			integrators[i] = rk
-		}
-		i++
-	}
-	for j := 0; j < int(NumberOfPeerMethods); j++ {
-		p, err := NewPeer(PeerMethod(j))
-		if err != nil {
-			t.Errorf("Couldn't create Peer Method %d: %s", j, err.Error())
-		} else {
-			integrators[i] = p
-		}
-		t.Logf("Integrators #%d", i)
-		i++
-	}
-	return
 }
 
 func testIntegrators(t *testing.T, methods []Integrator, iterations int) {
