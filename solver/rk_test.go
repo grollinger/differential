@@ -5,10 +5,6 @@ import (
 )
 
 func TestRK(t *testing.T) {
-	if !testing.Short() {
-		t.Skipf("Skipping because we're NOT running in short test mode.")
-	}
-
 	peer, _ := NewRK(DoPri5)
 
 	testIntegrators(t, []Integrator{peer}, 1)

@@ -1,14 +1,12 @@
 package solver
 
-import "testing"
+import (
+	"github.com/rollingthunder/differential/problems"
+	"testing"
+)
 
 func TestPeer(t *testing.T) {
-
-	if !testing.Short() {
-		t.Skipf("Skipping because we're NOT running in short test mode.")
-	}
-
-	peer, _ := NewPeer(EPP4)
+	peer, _ := NewPeer(EPP2)
 
 	testIntegrators(t, []Integrator{peer}, 1)
 }
@@ -29,4 +27,16 @@ func TestAllPeer(t *testing.T) {
 	}
 
 	testIntegrators(t, integrators, iterationsPerTest)
+}
+
+func TestPeerBruss2D(t *testing.T) {
+	peer, _ := NewPeer(EPP4)
+	bruss := problems.NewBruss2D(10)
+	instance := bruss.Initialize()
+
+	config := Config{
+		Fcn: bruss.Fcn,
+	}
+
+	peer.Integrate(0, 1, instance, config)
 }

@@ -67,9 +67,6 @@ func (p *peer) setCoeffs() (err error) {
 	case EPP2:
 		p.setEPP2Coeffs()
 	case EPP4:
-		p.order, p.stages, p.sigx = 4, 4, 1.4
-		p.name = "EPP4"
-		p.allocateCoeffs()
 		p.setEPP4Coeffs()
 	case EPP4y2:
 		p.order, p.stages, p.sigx = 4, 4, 1.6
@@ -243,7 +240,8 @@ func (p *peer) allocateCoeffs() {
 }
 
 func (p *peer) setEPP2Coeffs() {
-	p.order, p.stages, p.sigx = 4, 2, 1.5
+	// Fortran Code says order = 4 ... really?
+	p.order, p.stages, p.sigx = 2, 2, 1.5
 	p.name = "EPP2"
 	p.allocateCoeffs()
 	// p.ema = 0.0
@@ -256,6 +254,9 @@ func (p *peer) setEPP2Coeffs() {
 }
 
 func (p *peer) setEPP4Coeffs() {
+	p.order, p.stages, p.sigx = 4, 4, 1.4
+	p.name = "EPP4"
+	p.allocateCoeffs()
 	// p.ema = 0.0
 
 	p.c[0] = -1.0

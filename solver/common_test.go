@@ -43,9 +43,9 @@ type IntegrationTest struct {
 }
 
 var integrationTests = []IntegrationTest{
-	{-100, 100, order2, order2Deriv, 2, "x^2"},
-	{-100, 100, order3, order3Deriv, 3, "x^3"},
-	{-100, 100, order4, order4Deriv, 4, "x^4"},
+	{-10, 10, order2, order2Deriv, 2, "x^2"},
+	{-10, 10, order3, order3Deriv, 3, "x^3"},
+	{-10, 10, order4, order4Deriv, 4, "x^4"},
 }
 
 func randomInInterval(low, high float64) float64 {
