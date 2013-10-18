@@ -155,8 +155,11 @@ func (p *peer) setCoeffs() (err error) {
 		p.pv[i][p.stages-1] = p.pv[i][p.stages-1] + 1.0
 	}
 
+	//pa0 = matmul(ppv,pcv)
 	for i = 0; i < p.stages; i++ {
 		for j = 0; j < p.stages; j++ {
+			// unnecessary because of go memory initializer
+			// p.a0[i][j] = 0.0
 			for k = 0; k < p.stages; k++ {
 				p.a0[i][j] = p.a0[i][j] + p.pv[i][k]*p.cv[k][j]
 			}

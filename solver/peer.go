@@ -54,6 +54,10 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statisti
 
 	// startup with DOPRI
 	dopri, err := NewRK(DoPri5)
+	if err != nil {
+		err = errors.New("error during startup: " + err.Error())
+		return
+	}
 
 	copy(yy[old][p.icmin], yT)
 
@@ -84,6 +88,7 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statisti
 		err = errors.New("error during startup: " + err.Error())
 		return
 	}
+	tc = rkStat.CurrentTime
 
 	stat.EvaluationCount += rkStat.EvaluationCount
 	c.Fcn(tc, yy[old][p.icmax], ff[old][p.icmax])
