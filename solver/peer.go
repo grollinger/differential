@@ -2,7 +2,6 @@ package solver
 
 import (
 	"errors"
-	"fmt"
 	"math"
 )
 
@@ -68,7 +67,6 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statisti
 	stepEstimate := c.InitialStepSize
 	if stepEstimate <= 0.0 {
 		stepEstimate = estimateStepSize(t, yT, ff[old][p.icmin], &c, p.order)
-		fmt.Println("Computing Stepsize: ", stepEstimate)
 	}
 
 	copy(yy[old][p.icmax], yT)
