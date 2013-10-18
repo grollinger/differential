@@ -65,9 +65,6 @@ func vanderMonde(pc []float64, pm [][]float64) {
 func (p *peer) setCoeffs() (err error) {
 	switch p.method {
 	case EPP2:
-		p.order, p.stages, p.sigx = 4, 2, 1.5
-		p.name = "EPP2"
-		p.allocateCoeffs()
 		p.setEPP2Coeffs()
 	case EPP4:
 		p.order, p.stages, p.sigx = 4, 4, 1.4
@@ -243,16 +240,16 @@ func (p *peer) allocateCoeffs() {
 }
 
 func (p *peer) setEPP2Coeffs() {
-
+	p.order, p.stages, p.sigx = 4, 2, 1.5
+	p.name = "EPP2"
+	p.allocateCoeffs()
 	// p.ema = 0.0
 
 	p.c[0] = -1.0
 	p.c[1] = 1.0
 
-	p.b[0][0] = 0.5
-	p.b[0][1] = 0.5
-	p.b[1][0] = 0.5
-	p.b[1][1] = 0.5
+	p.b[0][0], p.b[0][1] = 0.5, 0.5
+	p.b[1][0], p.b[1][1] = 0.5, 0.5
 }
 
 func (p *peer) setEPP4Coeffs() {
