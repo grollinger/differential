@@ -82,12 +82,12 @@ func (b *brusselator) Fcn(t float64, yT []float64, dy_out []float64) {
 // alpha = 0.002
 // u(0, x, y) = 2 + 0.25y
 // v(0, x, y) = 1 + 0.8x
-func NewBruss2D(n int) (b brusselator) {
-
+func NewBruss2D(n int) Problem {
+	var b brusselator
 	b.a, b.b, b.n = 3.4, 1.0, n
 	b.cellcount = n * n
 	b.alpha = 0.002
 	n1 := float64(n) - 1.0
 	b.a1, b.alphaN1Squared = b.a+1.0, b.alpha*n1*n1
-	return
+	return &b
 }
