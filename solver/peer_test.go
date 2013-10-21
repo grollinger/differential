@@ -61,6 +61,6 @@ func TestPeerMBody4h(t *testing.T) {
 
 	if testing.Verbose() {
 		t.Logf("MBody4H: %d steps, %d rejected, %d evaluations", stat.StepCount, stat.RejectedCount, stat.EvaluationCount)
-		t.Logf("MBody4H: result[0] = %f", instance[0])
+		t.Logf("MBody: result[0..10] = %f", instance[:10])
 	}
 }

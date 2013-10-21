@@ -36,8 +36,8 @@ func TestRKMBody4h(t *testing.T) {
 
 	config := Config{
 		Fcn:               mbody.Fcn,
-		AbsoluteTolerance: 1.e-14,
-		RelativeTolerance: 1.e-14,
+		AbsoluteTolerance: 1.e-5,
+		RelativeTolerance: 1.e-5,
 	}
 	t0, te := 0.0, 0.1
 
