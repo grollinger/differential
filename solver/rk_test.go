@@ -1,6 +1,7 @@
 package solver
 
 import (
+	"github.com/rollingthunder/differential/problems"
 	"testing"
 )
 
@@ -26,4 +27,28 @@ func TestAllRK(t *testing.T) {
 	}
 
 	testIntegrators(t, integrators, iterationsPerTest)
+}
+
+func TestRKMBody4h(t *testing.T) {
+	peer, _ := NewRK(DoPri5)
+	mbody := problems.NewMBody(4)
+	instance := mbody.Initialize()
+
+	config := Config{
+		Fcn:               mbody.Fcn,
+		AbsoluteTolerance: 1.e-14,
+		RelativeTolerance: 1.e-14,
+	}
+	t0, te := 0.0, 0.1
+
+	stat, err := peer.Integrate(t0, te, instance, config)
+
+	if err != nil {
+		t.Fatalf("Integration failed - %s", err.Error())
+	}
+
+	if testing.Verbose() {
+		t.Logf("MBody: %d steps, %d rejected, %d evaluations", stat.StepCount, stat.RejectedCount, stat.EvaluationCount)
+		t.Logf("MBody: result[0..10] = %f", instance[:10])
+	}
 }

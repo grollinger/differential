@@ -6,7 +6,7 @@ import (
 )
 
 func TestPeer(t *testing.T) {
-	peer, _ := NewPeer(EPP2)
+	peer, _ := NewPeer(EPP8_d)
 
 	testIntegrators(t, []Integrator{peer}, 1)
 }
@@ -39,4 +39,28 @@ func TestPeerBruss2D(t *testing.T) {
 	}
 
 	peer.Integrate(0, 1, instance, config)
+}
+
+func TestPeerMBody4h(t *testing.T) {
+	peer, _ := NewPeer(EPP8_d)
+	mbody := problems.NewMBody(4)
+	instance := mbody.Initialize()
+
+	config := Config{
+		Fcn:               mbody.Fcn,
+		AbsoluteTolerance: 1.e-5,
+		RelativeTolerance: 1.e-5,
+	}
+	t0, te := 0.0, 0.1
+
+	stat, err := peer.Integrate(t0, te, instance, config)
+
+	if err != nil {
+		t.Fatalf("Integration failed - %s", err.Error())
+	}
+
+	if testing.Verbose() {
+		t.Logf("MBody4H: %d steps, %d rejected, %d evaluations", stat.StepCount, stat.RejectedCount, stat.EvaluationCount)
+		t.Logf("MBody4H: result[0] = %f", instance[0])
+	}
 }
