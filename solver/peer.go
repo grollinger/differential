@@ -35,7 +35,7 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statisti
 
 	// local variables
 	n := uint(len(yT))
-	var old, new int
+	var old, newIdx int
 	var tc, t0, rer, rc, sigmn, sig, sighs float64
 
 	// allocate temp matrices
@@ -47,9 +47,9 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statisti
 
 	sigmn = 0.2
 
-	// switch-indices old+new=1
+	// switch-indices old+newIdx=1
 	old = 0
-	new = 1
+	newIdx = 1
 
 	// startup with DOPRI
 	dopri, err := NewRK(DoPri5)
@@ -129,14 +129,18 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statisti
 		stat.StepCount++
 		sig = stepNext / stepPrevious
 
+		// COMPUTE COEFFS -> "Co" Prefix
+		// stepPrevious*A row-wise
+		// Loops: CoStages( CoA0, CoA1 )
 		var stg, ic, id uint
-		// compute coeff. stepPrevious*A row-wise
+		/*@; BEGIN(CoStages=Nest) @*/
 		for stg = 0; stg < p.stages; stg++ {
+			sighs = stepPrevious
+			/*@; BEGIN(CoA0=Nest) @*/
 			for ic = 0; ic < p.stages; ic++ {
 				pa[stg][ic] = stepPrevious * p.a0[stg][ic]
 			}
-
-			sighs = stepPrevious
+			/*@; BEGIN(CoA1=Nest) @*/
 			for ic = 0; ic < p.stages; ic++ {
 				sighs = sighs * sig
 				for id = 0; id < p.stages; id++ {
@@ -145,13 +149,14 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statisti
 			}
 		}
 
-		// compute new stage solutions
+		// STAGE SOLUTIONS -> "St" Prefix
+		// Loops: StB
 		for id = 0; id < n; id++ {
 			for stg = 0; stg < p.stages; stg++ {
-				yy[new][stg][id] = 0.0
-
+				yy[newIdx][stg][id] = 0.0
+				/*@; BEGIN(StB=Nest) @*/
 				for ic = 0; ic < p.stages; ic++ {
-					yy[new][stg][id] = yy[new][stg][id] + p.b[stg][ic]*yy[old][ic][id]
+					yy[newIdx][stg][id] = yy[newIdx][stg][id] + p.b[stg][ic]*yy[old][ic][id]
 				}
 			}
 		}
@@ -159,23 +164,25 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statisti
 		for id = 0; id < n; id++ {
 			for stg = 0; stg < p.stages; stg++ {
 				for ic = 0; ic < p.stages; ic++ {
-					yy[new][stg][id] = yy[new][stg][id] + pa[stg][ic]*ff[old][ic][id]
+					yy[newIdx][stg][id] = yy[newIdx][stg][id] + pa[stg][ic]*ff[old][ic][id]
 				}
 			}
 		}
 
-		// function evaluations Fn=fcn(Yn) parallel:
+		// FUNCTION EVALUATIONS 
+		// Fn=fcn(Yn)
+		// Candidate for Parallelisation
 		for stg = 0; stg < p.stages; stg++ {
-			c.Fcn(t+stepNext*p.c[stg], yy[new][stg], ff[new][stg])
+			c.Fcn(t+stepNext*p.c[stg], yy[newIdx][stg], ff[newIdx][stg])
 		}
 
 		stat.EvaluationCount += p.stages
 
-		// compute error estimate with F(new):
+		// compute error estimate with F(newIdx):
 		for id = 0; id < n; id++ {
 			rc = 0.0
 			for stg = 0; stg < p.stages; stg++ {
-				rc = rc + p.e[stg]*ff[new][stg][id]
+				rc = rc + p.e[stg]*ff[newIdx][stg][id]
 			}
 			yf[id] = math.Pow(rc/(c.AbsoluteTolerance+c.RelativeTolerance*math.Abs(yT[id])), 2.0)
 		}
@@ -206,8 +213,8 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statisti
 		} else {
 			// accept step, swap YY & FF
 			sigmn = 0.2
-			old = new
-			new = 1 - old
+			old = newIdx
+			newIdx = 1 - old
 			copy(yT, yy[old][p.stages-1])
 			t = t + stepNext
 			stepPrevious = stepNext
