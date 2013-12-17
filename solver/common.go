@@ -3,6 +3,7 @@ package solver
 import "math"
 
 type Function func(t float64, yT []float64, dy_out []float64)
+type BlockFunction func(startIdx, blockSize int, t float64, yT []float64, dy_out []float64)
 
 type Config struct {
 	// InitialStepSize, if > 0.0 specifies the step size

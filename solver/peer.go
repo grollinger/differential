@@ -169,7 +169,7 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statisti
 			}
 		}
 
-		// FUNCTION EVALUATIONS 
+		// FUNCTION EVALUATIONS
 		// Fn=fcn(Yn)
 		// Candidate for Parallelisation
 		for stg = 0; stg < p.stages; stg++ {
