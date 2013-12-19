@@ -95,112 +95,116 @@ func NewBruss2D(N int) Problem {
 }
 
 func (b *brusselator) FcnBlock(startIdx, blockSize int, t float64, yT []float64, dy_out []float64) {
-	var l, idiv, imod, beginl, i2mod, id, id2 int
+	var lo, hi int
+	var loX, loY, hiX int
 
 	systemSize := b.cellcount * 2
+	line := 2 * b.n
 
 	// Force block boundaries to multiples of 2
 	// (don't calculate u_i,j and v_i,j in separate blocks)
 	if (blockSize % 2) == 1 {
 		if (startIdx % 2) == 0 { // == 0 because of 0 based arrays...
-			id = startIdx
-			id2 = startIdx + blockSize
+			lo = startIdx
+			hi = startIdx + blockSize
 		} else {
-			id = startIdx + 1
-			id2 = startIdx + blockSize - 1
+			lo = startIdx + 1
+			hi = startIdx + blockSize - 1
 		}
 	} else {
-		id = startIdx
-		id2 = startIdx + blockSize - 1
+		lo = startIdx
+		hi = startIdx + blockSize - 1
 	}
 
 	// Force end of the last block to
-	if id2 >= systemSize {
-		id2 = systemSize - 2
+	if hi >= systemSize {
+		hi = systemSize - 1
 	}
-	idiv = id / (2 * b.n)
-	imod = id % (2 * b.n)
+	loY = lo / line
+	loX = lo % line
+	hiX = (hi - 1) % line
 
-	for i := id; i <= id2; i++ {
+	for i := lo; i <= hi; i++ {
 		dy_out[i] = -4.0 * yT[i]
 	}
 
 	// Treat Elements on the left border of the grid, if any
-	if imod == 0 {
-		beginl = id
+	var lineBeginning int
+	if loX == 0 {
+		lineBeginning = lo
 	} else {
-		beginl = id + 2*b.n - imod
+		lineBeginning = lo + line - loX
 	}
-	for i := beginl; i <= id2; i += 2 * b.n {
-		dy_out[i] = dy_out[i] + 2.0*yT[i+2]
-		dy_out[i+1] = dy_out[i+1] + 2.0*yT[i+3]
-		if i > 1 && i < systemSize-2*b.n {
-			dy_out[i] = dy_out[i] + yT[i-2*b.n]
-			dy_out[i+1] = dy_out[i+1] + yT[i+1-2*b.n]
-			dy_out[i] = dy_out[i] + yT[i+2*b.n]
-			dy_out[i+1] = dy_out[i+1] + yT[i+1+2*b.n]
+	for i := lineBeginning; i <= hi; i += line {
+		dy_out[i] += 2.0 * yT[i+2]
+		dy_out[i+1] += 2.0 * yT[i+3]
+		if i > 1 && i < systemSize-line {
+			dy_out[i] += yT[i-line]
+			dy_out[i+1] += yT[i+1-line]
+			dy_out[i] += yT[i+line]
+			dy_out[i+1] += yT[i+1+line]
 		}
 	}
 
 	// Treat Elements on the top border of the grid, if any
-	for i := id; i <= 2*b.n-1; i++ {
-		dy_out[i] = dy_out[i] + 2.0*yT[i+2*b.n]
+	for i := lo; i <= line-1; i++ {
+		dy_out[i] = dy_out[i] + 2.0*yT[i+line]
 		// only for Elements NOT on the right or left borders
 		// those cases are handled elsewhere
-		if i > 1 && i < 2*b.n-2 {
-			dy_out[i] = dy_out[i] + yT[i-2]
-			dy_out[i] = dy_out[i] + yT[i+2]
+		if i > 1 && i < line-2 {
+			dy_out[i] += yT[i-2]
+			dy_out[i] += yT[i+2]
 		}
 	}
 
 	// Treat Elements on the right border of the grid, if any
-	endl := -1
-	if imod == 2*b.n-2 {
-		endl = id
+	var lineEnd int
+	if loX == line-2 {
+		lineEnd = lo
 	} else {
-		endl = id + 2*b.n - imod - 2
+		lineEnd = lo + line - loX - 2
 	}
-	for i := endl; i <= id2; i += 2 * b.n {
-		dy_out[i] = dy_out[i] + 2.0*yT[i-2]
-		dy_out[i+1] = dy_out[i+1] + 2.0*yT[i-1]
-		if i >= 2*b.n && i < systemSize-2*b.n {
-			dy_out[i] = dy_out[i] + yT[i-2*b.n]
-			dy_out[i+1] = dy_out[i+1] + yT[i+1-2*b.n]
-			dy_out[i] = dy_out[i] + yT[i+2*b.n]
-			dy_out[i+1] = dy_out[i+1] + yT[i+1+2*b.n]
+	for i := lineEnd; i <= hi; i += line {
+		dy_out[i] += 2.0 * yT[i-2]
+		dy_out[i+1] += 2.0 * yT[i-1]
+		if i >= line && i < systemSize-line {
+			dy_out[i] += yT[i-line]
+			dy_out[i+1] += yT[i+1-line]
+			dy_out[i] += yT[i+line]
+			dy_out[i+1] += yT[i+1+line]
 		}
 	}
 
 	// Treat Elements on the bottom border of the grid, if any
-	for i := util.Max(systemSize-2*b.n, id); i <= id2; i++ {
-		dy_out[i] = dy_out[i] + 2.0*yT[i-2*b.n]
+	for i := util.Max(systemSize-line, lo); i <= hi; i++ {
+		dy_out[i] += 2.0 * yT[i-line]
 		// only for Elements NOT on the right or left borders
 		// those cases are handled elsewhere
-		if i > systemSize-2*b.n+1 && i < systemSize-2 {
-			dy_out[i] = dy_out[i] + yT[i-2]
-			dy_out[i] = dy_out[i] + yT[i+2]
+		if i > systemSize-line+1 && i < systemSize-2 {
+			dy_out[i] += yT[i-2]
+			dy_out[i] += yT[i+2]
 		}
 	}
 	// Elements not in the top or bottom row, but in the first
 	// and potentially incomplete row of the block
-	if imod > 0 && idiv > 0 && idiv < b.n-1 {
-		for i := id; i <= util.Min(id+2*b.n-imod-2, id2); i++ {
-			dy_out[i] = dy_out[i] + yT[i-2] + yT[i+2] + yT[i-2*b.n] + yT[i+2*b.n]
+	if loX > 0 && loY > 0 && loY < b.n-1 {
+		for i := lo; i <= util.Min(lineEnd-1, hi); i++ {
+			dy_out[i] += yT[i-2] + yT[i+2] + yT[i-line] + yT[i+line]
 		}
 	}
-	i2mod = (id2 - 1) % (2 * b.n)
-	if i2mod > 1 && id2 >= id+2*b.n-imod && (id2)/(2*b.n) < b.n-1 {
-		for i := id2 - i2mod + 1; i <= id2; i++ {
-			dy_out[i] = dy_out[i] + yT[i-2] + yT[i+2] + yT[i-2*b.n] + yT[i+2*b.n]
+
+	if hiX > 1 && hi >= lo+line-loX && (hi)/(line) < b.n-1 {
+		for i := hi - hiX + 1; i <= hi; i++ {
+			dy_out[i] = dy_out[i] + yT[i-2] + yT[i+2] + yT[i-line] + yT[i+line]
 		}
 	}
-	for k := util.Max((id-1)/(2*b.n)+1, 1); k <= util.Min((id2+1)/(2*b.n)-1, b.n-2); k++ {
-		for i := 2; i < 2*b.n-2; i++ {
-			l = i + k*2*b.n
-			dy_out[l] = dy_out[l] + yT[l-2] + yT[l+2] + yT[l+2*b.n] + yT[l-2*b.n]
+	for k := util.Max((lo-1)/line+1, 1); k <= util.Min((hi+1)/line-1, b.n-2); k++ {
+		for i := 2; i < line-2; i++ {
+			l := i + k*line
+			dy_out[l] = dy_out[l] + yT[l-2] + yT[l+2] + yT[l+line] + yT[l-line]
 		}
 	}
-	for i := id; i <= id2; i += 2 {
+	for i := lo; i <= hi; i += 2 {
 		dy_out[i] = b.alphaN1Squared*dy_out[i] + b.b + yT[i]*yT[i]*yT[i+1] - b.a1*yT[i]
 		dy_out[i+1] = b.alphaN1Squared*dy_out[i+1] + b.a*yT[i] - yT[i]*yT[i]*yT[i+1]
 	}
