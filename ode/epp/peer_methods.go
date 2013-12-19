@@ -43,51 +43,51 @@ func (p *peer) setCoeffs() (err error) {
 	case EPP4:
 		p.setEPP4Coeffs()
 	case EPP4y2:
-		p.Order, p.Stages, p.sigx = 4, 4, 1.6
+		p.Order, p.Stages, p.stepRatioMax = 4, 4, 1.6
 		p.Name = "EPP4y2"
 		p.allocateCoeffs()
 		p.setEPP4y2Coeffs()
 	case EPP4y3:
-		p.Order, p.Stages, p.sigx = 4, 4, 1.6
-		p.ema = 0.3125
+		p.Order, p.Stages, p.stepRatioMax = 4, 4, 1.6
+		p.errorModelA = 0.3125
 		p.Name = "EPPy3"
 		p.allocateCoeffs()
 		p.setEPP4y3Coeffs()
 	case EPP4_06809:
-		p.Order, p.Stages, p.sigx = 4, 4, 1.6
+		p.Order, p.Stages, p.stepRatioMax = 4, 4, 1.6
 		p.Name = "EPP4_06809"
 		p.allocateCoeffs()
 		p.setEPP4_06809Coeffs()
 	case EPP6p1:
-		p.Order, p.Stages, p.sigx = 6, 6, 1.5
-		p.ema = 0.125
+		p.Order, p.Stages, p.stepRatioMax = 6, 6, 1.5
+		p.errorModelA = 0.125
 		p.Name = "EPP6p1"
 		p.allocateCoeffs()
 		p.setEPP6p1Coeffs()
 	case EPP6j1:
-		p.Order, p.Stages, p.sigx = 6, 6, 1.5
-		p.ema = 0.125
+		p.Order, p.Stages, p.stepRatioMax = 6, 6, 1.5
+		p.errorModelA = 0.125
 		p.Name = "EPP6j1"
 		p.allocateCoeffs()
 		p.setEPP6j1Coeffs()
 	case EPP8_d:
-		p.Order, p.Stages, p.sigx = 8, 8, 1.4
+		p.Order, p.Stages, p.stepRatioMax = 8, 8, 1.4
 		p.Name = "EPP8_d"
 		p.allocateCoeffs()
 		p.setEPP8_dCoeffs()
 	case EPP8sp8:
-		p.Order, p.Stages, p.sigx = 8, 8, 1.4
+		p.Order, p.Stages, p.stepRatioMax = 8, 8, 1.4
 		p.Name = "EPP8sp8"
 		p.allocateCoeffs()
 		p.setEPP8sp8Coeffs()
 	case EPP_x1: // absc=-0.524, B-norm=0.35*8
-		p.Order, p.Stages, p.sigx = 8, 8, 1.4
+		p.Order, p.Stages, p.stepRatioMax = 8, 8, 1.4
 		p.Name = "EPP_x1"
 		p.allocateCoeffs()
 		p.setEPP_x1Coeffs()
 	case EPP_x2: // absc=-0.466, efc=0, B-norm=0.35*8 /20061101
-		p.Order, p.Stages, p.sigx = 8, 8, 1.4
-		p.ema = 1.0 // interval [0.2,2]
+		p.Order, p.Stages, p.stepRatioMax = 8, 8, 1.4
+		p.errorModelA = 1.0 // interval [0.2,2]
 		p.Name = "EPP_x2"
 		p.allocateCoeffs()
 		p.setEPP_x2Coeffs()
@@ -101,8 +101,8 @@ func (p *peer) setCoeffs() (err error) {
 	p.ensureOneRowSums()
 
 	// auxiliary parameters for local error model
-	p.ema = 0.0 //ausschalten
-	p.emaoh = math.Pow(p.ema, float64(p.Order)/2.0)
+	p.errorModelA = 0.0 //ausschalten
+	p.errorModelA0 = math.Pow(p.errorModelA, float64(p.Order)/2.0)
 
 	var i, j, k uint
 
@@ -168,7 +168,7 @@ func (p *peer) setCoeffs() (err error) {
 	VanderMonde(p.c, p.pv) // now PPV=D^(-1)*P*V^(-1)
 
 	// error estimate with last row of PPV
-	copy(p.e, p.pv[p.Stages-1])
+	copy(p.errorModelWeights, p.pv[p.Stages-1])
 
 	return
 }
@@ -191,22 +191,22 @@ func (p *peer) ensureOneRowSums() {
 
 func (p *peer) findMinMaxNodes() {
 	// ! minimal and maximal nodes:
-	p.icmin = 0
-	p.icmax = uint(p.Stages) - 1
+	p.indexMinNode = 0
+	p.indexMaxNode = uint(p.Stages) - 1
 
 	var i uint
 	for i = 0; i < p.Stages; i++ {
-		if p.c[i] < p.c[p.icmin] {
-			p.icmin = i
+		if p.c[i] < p.c[p.indexMinNode] {
+			p.indexMinNode = i
 		}
-		if p.c[i] > p.c[p.icmax] {
-			p.icmax = i
+		if p.c[i] > p.c[p.indexMaxNode] {
+			p.indexMaxNode = i
 		}
 	}
 }
 
 func (p *peer) allocateCoeffs() {
-	p.c, p.e = make([]float64, p.Stages), make([]float64, p.Stages)
+	p.c, p.errorModelWeights = make([]float64, p.Stages), make([]float64, p.Stages)
 	p.b = util.MakeSquare(p.Stages)
 	p.a0 = util.MakeSquare(p.Stages)
 	p.cv = util.MakeSquare(p.Stages)
@@ -215,10 +215,10 @@ func (p *peer) allocateCoeffs() {
 
 func (p *peer) setEPP2Coeffs() {
 	// Fortran Code says order = 4 ... really?
-	p.Order, p.Stages, p.sigx = 2, 2, 1.5
+	p.Order, p.Stages, p.stepRatioMax = 2, 2, 1.5
 	p.Name = "EPP2"
 	p.allocateCoeffs()
-	// p.ema = 0.0
+	// p.errorModelA = 0.0
 
 	p.c[0] = -1.0
 	p.c[1] = 1.0
@@ -228,10 +228,10 @@ func (p *peer) setEPP2Coeffs() {
 }
 
 func (p *peer) setEPP4Coeffs() {
-	p.Order, p.Stages, p.sigx = 4, 4, 1.4
+	p.Order, p.Stages, p.stepRatioMax = 4, 4, 1.4
 	p.Name = "EPP4"
 	p.allocateCoeffs()
-	// p.ema = 0.0
+	// p.errorModelA = 0.0
 
 	p.c[0] = -1.0
 	p.c[1] = -2.0 / 5.0
@@ -257,7 +257,7 @@ func (p *peer) setEPP4Coeffs() {
 }
 
 func (p *peer) setEPP4y2Coeffs() {
-	// p.ema = 0.0
+	// p.errorModelA = 0.0
 
 	p.c[0] = 0.44856672599000208
 	p.c[1] = 1.39573694851711427

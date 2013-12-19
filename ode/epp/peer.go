@@ -15,20 +15,29 @@ type peer struct {
 }
 
 type peerCoefficients struct {
-	icmin, icmax uint
+	indexMinNode, indexMaxNode uint
 
-	sigx, ema, emaoh float64
-	c, e             []float64
-	b, a0, cv, pv    [][]float64
+	stepRatioMax float64
+
+	// Error Model
+	// p=order/2
+	// ((1+a)^p-a^p)/est+a^p)^(1/p)-a
+	errorModelA float64
+	// a0 = a^p
+	errorModelA0      float64
+	errorModelWeights []float64
+
+	c             []float64
+	b, a0, cv, pv [][]float64
 }
 
 type integration struct {
 	Config
 	Statistics
-	fOld, fNew, yOld, yNew, pa                                     [][]float64
-	yf                                                             []float64
-	tc, t0, rer, rc, sigmn, sig, sighs, stepEstimate, stepPrevious float64
-	n                                                              uint
+	fOld, fNew, yOld, yNew, pa                              [][]float64
+	yf                                                      []float64
+	t0, stepRatioMin, stepRatio, stepEstimate, stepPrevious float64
+	n                                                       uint
 }
 
 func (p *peer) Integrate(t, tEnd float64, yT []float64, cfg Config) (stat Statistics, err error) {
@@ -39,7 +48,6 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, cfg Config) (stat Statis
 	// end of start interval
 	t = in.t0 + in.stepPrevious
 	in.stepEstimate = in.stepPrevious // continue with stepsize stepPrevious
-	copy(yT, in.yOld[p.Stages-1])     // solution at T
 
 	var stepNext float64
 	// repeat until tend
@@ -50,36 +58,19 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, cfg Config) (stat Statis
 		stepNext = in.stepEstimate
 
 		stat.StepCount++
-		in.sig = stepNext / in.stepPrevious
+		in.stepRatio = stepNext / in.stepPrevious
 
-		// COMPUTE COEFFS -> "Co" Prefix
-		// stepPrevious*A row-wise
-		// Loops: CoStages( CoA0, CoA1 )
-		var stg, ic, id uint
-		/*@; BEGIN(CoStages=Nest) @*/
-		for stg = 0; stg < p.Stages; stg++ {
-			in.sighs = in.stepPrevious
-			/*@; BEGIN(CoA0=Nest) @*/
-			for ic = 0; ic < p.Stages; ic++ {
-				in.pa[stg][ic] = in.stepPrevious * p.a0[stg][ic]
-			}
-			/*@; BEGIN(CoA1=Nest) @*/
-			for ic = 0; ic < p.Stages; ic++ {
-				in.sighs = in.sighs * in.sig
-				for id = 0; id < p.Stages; id++ {
-					in.pa[stg][id] = in.pa[stg][id] + p.cv[stg][ic]*in.sighs*p.pv[ic][id]
-				}
-			}
-		}
+		p.computeCoefficients(&in)
 
 		// STAGE SOLUTIONS -> "St" Prefix
+		var stg, ic, id uint
 		// Loops: StB
 		for id = 0; id < in.n; id++ {
 			for stg = 0; stg < p.Stages; stg++ {
 				in.yNew[stg][id] = 0.0
 				/*@; BEGIN(StB=Nest) @*/
 				for ic = 0; ic < p.Stages; ic++ {
-					in.yNew[stg][id] = in.yNew[stg][id] + p.b[stg][ic]*in.yOld[ic][id]
+					in.yNew[stg][id] += p.b[stg][ic] * in.yOld[ic][id]
 				}
 			}
 		}
@@ -87,7 +78,7 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, cfg Config) (stat Statis
 		for id = 0; id < in.n; id++ {
 			for stg = 0; stg < p.Stages; stg++ {
 				for ic = 0; ic < p.Stages; ic++ {
-					in.yNew[stg][id] = in.yNew[stg][id] + in.pa[stg][ic]*in.fOld[ic][id]
+					in.yNew[stg][id] += in.pa[stg][ic] * in.fOld[ic][id]
 				}
 			}
 		}
@@ -101,31 +92,31 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, cfg Config) (stat Statis
 
 		stat.EvaluationCount += p.Stages
 
-		// compute error estimate with F(newIdx):
+		// compute error estimate with fNew:
 		for id = 0; id < in.n; id++ {
-			in.rc = 0.0
+			rc := 0.0
 			for stg = 0; stg < p.Stages; stg++ {
-				in.rc = in.rc + p.e[stg]*in.fNew[stg][id]
+				rc += p.errorModelWeights[stg] * in.fNew[stg][id]
 			}
-			in.yf[id] = math.Pow(in.rc/(in.AbsoluteTolerance+in.RelativeTolerance*math.Abs(yT[id])), 2.0)
+			in.yf[id] = math.Pow(rc/(in.AbsoluteTolerance+in.RelativeTolerance*math.Abs(in.yOld[p.Stages-1][id])), 2.0)
 		}
 
 		// compute error quotient/20070803
 		// step ratio from error model ((1+a)^p-a^p)/est+a^p)^(1/p)-a, p=order/2:
-		in.rer = 0.0
+		errorRelative := 0.0
 		for id = 0; id < in.n; id++ {
-			in.rer = in.rer + in.yf[id]
+			errorRelative += in.yf[id]
 		}
 
-		in.rer = stepNext*math.Sqrt(in.rer/float64(in.n)) + 1e-8
-		in.sighs = math.Pow(math.Pow(in.sig, 2.0)+p.ema, float64(p.Order)/2.0) - p.emaoh
-		in.stepEstimate = math.Pow(in.sighs/in.rer+p.emaoh, 2.0/float64(p.Order)) - p.ema
-		in.stepEstimate = in.stepPrevious * math.Max(in.sigmn, math.Min(0.95*math.Sqrt(in.stepEstimate), p.sigx)) // safety interval
+		errorEstimate := stepNext*math.Sqrt(errorRelative/float64(in.n)) + 1e-8
+		errorModelDenom := math.Pow(math.Pow(in.stepRatio, 2.0)+p.errorModelA, float64(p.Order)/2.0) - p.errorModelA0
+		in.stepEstimate = math.Pow(errorModelDenom/errorEstimate+p.errorModelA0, 2.0/float64(p.Order)) - p.errorModelA
+		in.stepEstimate = in.stepPrevious * math.Max(in.stepRatioMin, math.Min(0.95*math.Sqrt(in.stepEstimate), p.stepRatioMax)) // safety interval
 
-		// reject step
-		if in.rer > 1.0 {
+		if errorEstimate > 1.0 {
+			// reject step
 			// decrease minimal stepsize ratio
-			in.sigmn = in.sigmn * 0.2
+			in.stepRatioMin = in.stepRatioMin * 0.2
 			stat.RejectedCount++
 
 			// report failure
@@ -134,9 +125,10 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, cfg Config) (stat Statis
 				break
 			}
 		} else {
-			// accept step, swap YY & FF
-			in.sigmn = 0.2
+			// accept step
+			in.stepRatioMin = 0.2
 
+			// swap Y & F
 			swap := in.yOld
 			in.yOld = in.yNew
 			in.yNew = swap
@@ -145,7 +137,6 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, cfg Config) (stat Statis
 			in.fOld = in.fNew
 			in.fNew = swap
 
-			copy(yT, in.yOld[p.Stages-1])
 			t = t + stepNext
 			in.stepPrevious = stepNext
 		}
@@ -156,10 +147,11 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, cfg Config) (stat Statis
 			break
 		}
 	}
+	// output of last stage is the final output
+	copy(yT, in.yOld[p.Stages-1])
 
-	// set return code and time
 	stat.CurrentTime = t
-	stat.LastStepSize = stepNext
+	stat.LastStepSize = in.stepPrevious
 	stat.NextStepSize = in.stepEstimate
 	return
 }
@@ -196,9 +188,9 @@ func (p *peer) setupIntegration(t, tEnd float64, yT []float64, c Config) (i inte
 	i.fNew = util.MakeRectangular(p.Stages, i.n)
 	i.fOld = util.MakeRectangular(p.Stages, i.n)
 
-	copy(i.yOld[p.icmin], yT)
+	copy(i.yOld[p.indexMinNode], yT)
 
-	i.sigmn = 0.2
+	i.stepRatioMin = 0.2
 	i.t0 = t
 
 	return
@@ -212,17 +204,17 @@ func (p *peer) startupIntegration(in *integration) {
 		return
 	}
 
-	in.Fcn(in.t0, in.yOld[p.icmin], in.fOld[p.icmin])
+	in.Fcn(in.t0, in.yOld[p.indexMinNode], in.fOld[p.indexMinNode])
 	in.EvaluationCount = 1
 
 	// guess initial step size if unspecified
 	in.stepEstimate = in.InitialStepSize
 	if in.stepEstimate <= 0.0 {
-		in.stepEstimate = EstimateStepSize(in.t0, in.yOld[p.icmin], in.fOld[p.icmin], &in.Config, p.Order)
+		in.stepEstimate = EstimateStepSize(in.t0, in.yOld[p.indexMinNode], in.fOld[p.indexMinNode], &in.Config, p.Order)
 	}
 
-	copy(in.yOld[p.icmax], in.yOld[p.icmin])
-	in.tc = in.t0
+	copy(in.yOld[p.indexMaxNode], in.yOld[p.indexMinNode])
+	tCurrent := in.t0
 
 	//  higher accuracy for starting proc
 	rkConfig := Config{
@@ -233,28 +225,28 @@ func (p *peer) startupIntegration(in *integration) {
 		Fcn:               in.Fcn,
 	}
 
-	rkStat, err := dopri.Integrate(in.tc, in.t0+in.stepEstimate, in.yOld[p.icmax], rkConfig)
+	rkStat, err := dopri.Integrate(tCurrent, in.t0+in.stepEstimate, in.yOld[p.indexMaxNode], rkConfig)
 	if err != nil {
 		err = errors.New("error during startup: " + err.Error())
 		return
 	}
-	in.tc = rkStat.CurrentTime
+	tCurrent = rkStat.CurrentTime
 
 	in.EvaluationCount += rkStat.EvaluationCount
-	in.Fcn(in.tc, in.yOld[p.icmax], in.fOld[p.icmax])
+	in.Fcn(tCurrent, in.yOld[p.indexMaxNode], in.fOld[p.indexMaxNode])
 	in.EvaluationCount++
 
 	// adjusted step size, relative to interval [0,1]:
-	in.stepPrevious = (in.tc - in.t0) / (p.c[p.icmax] - p.c[p.icmin])
+	in.stepPrevious = (tCurrent - in.t0) / (p.c[p.indexMaxNode] - p.c[p.indexMinNode])
 	origT0 := in.t0
-	in.t0 -= in.stepPrevious * p.c[p.icmin] // corresponds to node pc=0
+	in.t0 -= in.stepPrevious * p.c[p.indexMinNode] // corresponds to node pc=0
 
 	// startup procedure
 	var stg uint
 	for stg = 0; stg < p.Stages; stg++ {
-		if stg != p.icmin && stg != p.icmax {
-			copy(in.yOld[stg], in.yOld[p.icmin])
-			rkConfig.InitialStepSize = in.stepPrevious * (p.c[stg] - p.c[p.icmin])
+		if stg != p.indexMinNode && stg != p.indexMaxNode {
+			copy(in.yOld[stg], in.yOld[p.indexMinNode])
+			rkConfig.InitialStepSize = in.stepPrevious * (p.c[stg] - p.c[p.indexMinNode])
 			tStage := in.t0 + in.stepPrevious*p.c[stg]
 			rkStat, err = dopri.Integrate(origT0, tStage, in.yOld[stg], rkConfig)
 			if err != nil {
@@ -263,6 +255,29 @@ func (p *peer) startupIntegration(in *integration) {
 			}
 			in.Fcn(tStage, in.yOld[stg], in.fOld[stg])
 			in.EvaluationCount += rkStat.EvaluationCount + 1
+		}
+	}
+}
+
+func (p *peer) computeCoefficients(in *integration) {
+	// COMPUTE COEFFS -> "Co" Prefix
+	// stepPrevious*A row-wise
+	// Loops: CoStages( CoA0, CoA1 )
+	var stg, ic, id uint
+	/*@; BEGIN(CoStages=Nest) @*/
+	for stg = 0; stg < p.Stages; stg++ {
+		/*@; BEGIN(CoA0=Nest) @*/
+		for ic = 0; ic < p.Stages; ic++ {
+			in.pa[stg][ic] = in.stepPrevious * p.a0[stg][ic]
+		}
+
+		stepStage := in.stepPrevious
+		/*@; BEGIN(CoA1=Nest) @*/
+		for ic = 0; ic < p.Stages; ic++ {
+			stepStage *= in.stepRatio
+			for id = 0; id < p.Stages; id++ {
+				in.pa[stg][id] += p.cv[stg][ic] * stepStage * p.pv[ic][id]
+			}
 		}
 	}
 }

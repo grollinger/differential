@@ -1,33 +1,33 @@
 package epp
 
 import (
-	"fmt"
 	. "github.com/rollingthunder/differential/ode"
 	"github.com/rollingthunder/differential/problems"
 	"testing"
 )
 
-func BenchmarkIntegrate(b *testing.B) {
-	p, err := NewPeer(EPP4y3)
-
-	if err != nil {
-		b.Fatal(err)
-	}
+func setupBenchmark() (p *peer, in integration, y0 []float64) {
+	integrator, _ := NewPeer(EPP4y3)
+	p = integrator.(*peer)
 
 	brus := problems.NewBruss2D(200)
-	y0 := brus.Initialize()
+	y0 = brus.Initialize()
 
 	cfg := Config{
 		Fcn: brus.Fcn,
 	}
 
-	b.StartTimer()
+	in = p.setupIntegration(0.0, 1.0, y0, cfg)
 
-	stat, err := p.Integrate(0.0, 1.0, y0, cfg)
+	return
+}
 
-	b.StopTimer()
+func BenchmarkCoefficients(b *testing.B) {
+	p, in, _ := setupBenchmark()
 
-	if testing.Verbose() {
-		b.Log(fmt.Sprintln("Steps: %d, Evals: %d", stat.StepCount, stat.EvaluationCount))
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		p.computeCoefficients(&in)
 	}
 }
