@@ -1,22 +1,18 @@
-package solver
+package rk
 
 import (
+	. "github.com/rollingthunder/differential/ode"
+	. "github.com/rollingthunder/differential/ode/testing"
 	"github.com/rollingthunder/differential/problems"
 	"testing"
 )
-
-func TestRK(t *testing.T) {
-	peer, _ := NewRK(DoPri5)
-
-	testIntegrators(t, []Integrator{peer}, 1)
-}
 
 func TestAllRK(t *testing.T) {
 	if testing.Short() {
 		t.Skipf("Skipping because we're running in short test mode.")
 	}
 
-	integrators := make([]Integrator, NumberOfRKMethods+NumberOfPeerMethods)
+	integrators := make([]Integrator, NumberOfRKMethods)
 	for j := 0; j < int(NumberOfRKMethods); j++ {
 		rk, err := NewRK(RKMethod(j))
 		if err != nil {
@@ -26,7 +22,7 @@ func TestAllRK(t *testing.T) {
 		}
 	}
 
-	testIntegrators(t, integrators, iterationsPerTest)
+	RunIntegratorTests(t, integrators, 1)
 }
 
 func TestRKMBody4h(t *testing.T) {

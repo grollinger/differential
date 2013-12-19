@@ -1,7 +1,9 @@
-package solver
+package epp
 
 import (
 	"errors"
+	. "github.com/rollingthunder/differential/ode"
+	"github.com/rollingthunder/differential/util"
 	"math"
 )
 
@@ -34,34 +36,6 @@ func NewPeer(m PeerMethod) (i Integrator, err error) {
 	return
 }
 
-//-- solves Vandermonde systems PM_new*V=PM
-func vanderMonde(pc []float64, pm [][]float64) {
-	var i, j, k int
-	n := len(pc)
-
-	for k = 0; k < n-1; k++ {
-		for j = n - 1; j >= k+1; j-- {
-			for i = 0; i < n; i++ {
-				pm[i][j] = pm[i][j] - pm[i][j-1]*pc[k]
-			}
-		}
-	}
-
-	for k = n - 2; k >= 0; k-- {
-		for j = k + 1; j < n; j++ {
-			for i = 0; i < n; i++ {
-				pm[i][j] = pm[i][j] / (pc[j] - pc[j-k-1])
-			}
-		}
-
-		for j = k; j < n-1; j++ {
-			for i = 0; i < n; i++ {
-				pm[i][j] = pm[i][j] - pm[i][j+1]
-			}
-		}
-	}
-}
-
 func (p *peer) setCoeffs() (err error) {
 	switch p.method {
 	case EPP2:
@@ -69,52 +43,52 @@ func (p *peer) setCoeffs() (err error) {
 	case EPP4:
 		p.setEPP4Coeffs()
 	case EPP4y2:
-		p.order, p.stages, p.sigx = 4, 4, 1.6
-		p.name = "EPP4y2"
+		p.Order, p.Stages, p.sigx = 4, 4, 1.6
+		p.Name = "EPP4y2"
 		p.allocateCoeffs()
 		p.setEPP4y2Coeffs()
 	case EPP4y3:
-		p.order, p.stages, p.sigx = 4, 4, 1.6
+		p.Order, p.Stages, p.sigx = 4, 4, 1.6
 		p.ema = 0.3125
-		p.name = "EPPy3"
+		p.Name = "EPPy3"
 		p.allocateCoeffs()
 		p.setEPP4y3Coeffs()
 	case EPP4_06809:
-		p.order, p.stages, p.sigx = 4, 4, 1.6
-		p.name = "EPP4_06809"
+		p.Order, p.Stages, p.sigx = 4, 4, 1.6
+		p.Name = "EPP4_06809"
 		p.allocateCoeffs()
 		p.setEPP4_06809Coeffs()
 	case EPP6p1:
-		p.order, p.stages, p.sigx = 6, 6, 1.5
+		p.Order, p.Stages, p.sigx = 6, 6, 1.5
 		p.ema = 0.125
-		p.name = "EPP6p1"
+		p.Name = "EPP6p1"
 		p.allocateCoeffs()
 		p.setEPP6p1Coeffs()
 	case EPP6j1:
-		p.order, p.stages, p.sigx = 6, 6, 1.5
+		p.Order, p.Stages, p.sigx = 6, 6, 1.5
 		p.ema = 0.125
-		p.name = "EPP6j1"
+		p.Name = "EPP6j1"
 		p.allocateCoeffs()
 		p.setEPP6j1Coeffs()
 	case EPP8_d:
-		p.order, p.stages, p.sigx = 8, 8, 1.4
-		p.name = "EPP8_d"
+		p.Order, p.Stages, p.sigx = 8, 8, 1.4
+		p.Name = "EPP8_d"
 		p.allocateCoeffs()
 		p.setEPP8_dCoeffs()
 	case EPP8sp8:
-		p.order, p.stages, p.sigx = 8, 8, 1.4
-		p.name = "EPP8sp8"
+		p.Order, p.Stages, p.sigx = 8, 8, 1.4
+		p.Name = "EPP8sp8"
 		p.allocateCoeffs()
 		p.setEPP8sp8Coeffs()
 	case EPP_x1: // absc=-0.524, B-norm=0.35*8
-		p.order, p.stages, p.sigx = 8, 8, 1.4
-		p.name = "EPP_x1"
+		p.Order, p.Stages, p.sigx = 8, 8, 1.4
+		p.Name = "EPP_x1"
 		p.allocateCoeffs()
 		p.setEPP_x1Coeffs()
 	case EPP_x2: // absc=-0.466, efc=0, B-norm=0.35*8 /20061101
-		p.order, p.stages, p.sigx = 8, 8, 1.4
+		p.Order, p.Stages, p.sigx = 8, 8, 1.4
 		p.ema = 1.0 // interval [0.2,2]
-		p.name = "EPP_x2"
+		p.Name = "EPP_x2"
 		p.allocateCoeffs()
 		p.setEPP_x2Coeffs()
 	default:
@@ -128,73 +102,73 @@ func (p *peer) setCoeffs() (err error) {
 
 	// auxiliary parameters for local error model
 	p.ema = 0.0 //ausschalten
-	p.emaoh = math.Pow(p.ema, float64(p.order)/2.0)
+	p.emaoh = math.Pow(p.ema, float64(p.Order)/2.0)
 
 	var i, j, k uint
 
 	//compute matrix PCV = diag(C)*VdM
-	for i = 0; i < p.stages; i++ {
+	for i = 0; i < p.Stages; i++ {
 		p.cv[i][0] = p.c[i]
-		for j = 1; j < p.stages; j++ {
+		for j = 1; j < p.Stages; j++ {
 			p.cv[i][j] = p.c[i] * p.cv[i][j-1]
 		}
 	}
 
 	// compute matrix PA0, ppv used as temporary memory
-	for i = 0; i < p.stages; i++ {
-		for j = 0; j < p.stages; j++ {
+	for i = 0; i < p.Stages; i++ {
+		for j = 0; j < p.Stages; j++ {
 			p.pv[i][j] = -p.b[i][j]
 		}
 	}
 
 	// now \ones*e_s^T-B
-	for i = 0; i < p.stages; i++ {
-		p.pv[i][p.stages-1] = p.pv[i][p.stages-1] + 1.0
+	for i = 0; i < p.Stages; i++ {
+		p.pv[i][p.Stages-1] = p.pv[i][p.Stages-1] + 1.0
 	}
 
 	//pa0 = matmul(ppv,pcv)
-	for i = 0; i < p.stages; i++ {
-		for j = 0; j < p.stages; j++ {
+	for i = 0; i < p.Stages; i++ {
+		for j = 0; j < p.Stages; j++ {
 			// unnecessary because of go memory initializer
 			// p.a0[i][j] = 0.0
-			for k = 0; k < p.stages; k++ {
+			for k = 0; k < p.Stages; k++ {
 				p.a0[i][j] = p.a0[i][j] + p.pv[i][k]*p.cv[k][j]
 			}
 		}
 	}
 
 	// scale columns
-	for j = 1; j < p.stages; j++ {
-		for i = 0; i < p.stages; i++ {
+	for j = 1; j < p.Stages; j++ {
+		for i = 0; i < p.Stages; i++ {
 			p.a0[i][j] = p.a0[i][j] / (float64(j) + 1.0)
 		}
 	}
 
-	vanderMonde(p.c, p.a0) // now PA0=(\ones*e_s^T-B)*C*V*(V*D)^(-1)
+	VanderMonde(p.c, p.a0) // now PA0=(\ones*e_s^T-B)*C*V*(V*D)^(-1)
 
 	// compute matrix PPV:
-	for j = 0; j < p.stages; j++ {
+	for j = 0; j < p.Stages; j++ {
 		p.pv[0][j] = 1.0
 	}
 
-	for i = 1; i < p.stages; i++ {
+	for i = 1; i < p.Stages; i++ {
 		p.pv[i][0] = 0.0
-		for j = 0; j < p.stages-1; j++ {
+		for j = 0; j < p.Stages-1; j++ {
 			p.pv[i][j+1] = p.pv[i][j] + p.pv[i-1][j]
 		}
 	}
 
 	// scale rows
-	for i = 0; i < p.stages; i++ {
-		for j = 0; j < p.stages; j++ {
+	for i = 0; i < p.Stages; i++ {
+		for j = 0; j < p.Stages; j++ {
 			p.pv[i][j] = p.pv[i][j] / (float64(i) + 1.0)
 		}
 	}
 
-	vanderMonde(p.c, p.pv) // now PPV=D^(-1)*P*V^(-1)
+	VanderMonde(p.c, p.pv) // now PPV=D^(-1)*P*V^(-1)
 
 	// error estimate with last row of PPV
-	copy(p.e, p.pv[p.stages-1])
+	copy(p.e, p.pv[p.Stages-1])
 
 	return
 }
@@ -206,22 +180,22 @@ func stagesOf(m PeerMethod) uint {
 func (p *peer) ensureOneRowSums() {
 	// row sums of B must be 1 exactly
 	var i, j uint
-	for i = 0; i < p.stages; i++ {
+	for i = 0; i < p.Stages; i++ {
 		s := 1.0
-		for j = 0; j < p.stages; j++ {
+		for j = 0; j < p.Stages; j++ {
 			s = s - p.b[i][j]
 		}
-		p.b[i][p.stages-1] = p.b[i][p.stages-1] + s
+		p.b[i][p.Stages-1] = p.b[i][p.Stages-1] + s
 	}
 }
 
 func (p *peer) findMinMaxNodes() {
 	// ! minimal and maximal nodes:
 	p.icmin = 0
-	p.icmax = uint(p.stages) - 1
+	p.icmax = uint(p.Stages) - 1
 
 	var i uint
-	for i = 0; i < p.stages; i++ {
+	for i = 0; i < p.Stages; i++ {
 		if p.c[i] < p.c[p.icmin] {
 			p.icmin = i
 		}
@@ -232,17 +206,17 @@ func (p *peer) findMinMaxNodes() {
 }
 
 func (p *peer) allocateCoeffs() {
-	p.c, p.e = make([]float64, p.stages), make([]float64, p.stages)
-	p.b = makeSquare(p.stages)
-	p.a0 = makeSquare(p.stages)
-	p.cv = makeSquare(p.stages)
-	p.pv = makeSquare(p.stages)
+	p.c, p.e = make([]float64, p.Stages), make([]float64, p.Stages)
+	p.b = util.MakeSquare(p.Stages)
+	p.a0 = util.MakeSquare(p.Stages)
+	p.cv = util.MakeSquare(p.Stages)
+	p.pv = util.MakeSquare(p.Stages)
 }
 
 func (p *peer) setEPP2Coeffs() {
 	// Fortran Code says order = 4 ... really?
-	p.order, p.stages, p.sigx = 2, 2, 1.5
-	p.name = "EPP2"
+	p.Order, p.Stages, p.sigx = 2, 2, 1.5
+	p.Name = "EPP2"
 	p.allocateCoeffs()
 	// p.ema = 0.0
 
@@ -254,8 +228,8 @@ func (p *peer) setEPP2Coeffs() {
 }
 
 func (p *peer) setEPP4Coeffs() {
-	p.order, p.stages, p.sigx = 4, 4, 1.4
-	p.name = "EPP4"
+	p.Order, p.Stages, p.sigx = 4, 4, 1.4
+	p.Name = "EPP4"
 	p.allocateCoeffs()
 	// p.ema = 0.0
 

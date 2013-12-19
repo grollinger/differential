@@ -1,6 +1,10 @@
-package solver
+package rk
 
-import "errors"
+import (
+	"errors"
+	"github.com/rollingthunder/differential/ode"
+	"github.com/rollingthunder/differential/util"
+)
 
 const (
 	RK2               = RKMethod(iota) // RK2(3)
@@ -9,22 +13,22 @@ const (
 	NumberOfRKMethods = uint(iota)
 )
 
-func NewRK(m RKMethod) (i Integrator, err error) {
+func NewRK(m RKMethod) (i ode.Integrator, err error) {
 	var r rk
 	switch m {
 	case RK2:
-		r.stages, r.order = 3, 3
-		r.name = "RK2"
+		r.Stages, r.Order = 3, 3
+		r.Name = "RK2"
 		makeCoeffs(&r)
 		setCoeffsRK2(&r)
 	case RKFB4:
-		r.stages, r.order = 6, 4
-		r.name = "RKFB4"
+		r.Stages, r.Order = 6, 4
+		r.Name = "RKFB4"
 		makeCoeffs(&r)
 		setCoeffsRKFB4(&r)
 	case DoPri5:
-		r.stages, r.order = 7, 5
-		r.name = "DoPri5"
+		r.Stages, r.Order = 7, 5
+		r.Name = "DoPri5"
 		r.firstStageAsLast = true
 		makeCoeffs(&r)
 		setCoeffsDoPri5(&r)
@@ -38,8 +42,8 @@ func NewRK(m RKMethod) (i Integrator, err error) {
 }
 
 func makeCoeffs(r *rk) {
-	r.b, r.c, r.e = make([]float64, r.stages), make([]float64, r.stages), make([]float64, r.stages)
-	r.a = makeSquare(r.stages)
+	r.b, r.c, r.e = make([]float64, r.Stages), make([]float64, r.Stages), make([]float64, r.Stages)
+	r.a = util.MakeSquare(r.Stages)
 }
 func setCoeffsRK2(r *rk) {
 	r.a[1][0] = 1.0
@@ -96,7 +100,7 @@ func setCoeffsRKFB4(r *rk) {
 
 	// for difference of solutions
 	var i uint
-	for i = 0; i < r.stages; i++ {
+	for i = 0; i < r.Stages; i++ {
 		r.e[i] = r.b[i] - r.e[i]
 	}
 }

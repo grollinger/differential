@@ -1,7 +1,9 @@
-package solver
+package rk
 
 import (
 	"errors"
+	. "github.com/rollingthunder/differential/ode"
+	"github.com/rollingthunder/differential/util"
 	"math"
 )
 
@@ -46,7 +48,7 @@ func (r *rk) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statistics
 	fcnValue := make([]float64, n)
 	yCurrent := make([]float64, n)
 	yError := make([]float64, n)
-	ks := makeRectangular(r.stages, uint(n))
+	ks := util.MakeRectangular(r.Stages, uint(n))
 
 	c.Fcn(t, yT, fcnValue)
 	stat.EvaluationCount = 1
@@ -54,7 +56,7 @@ func (r *rk) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statistics
 	// compute initial step size if not set
 	stepEstimate := c.InitialStepSize
 	if stepEstimate <= 0.0 {
-		stepEstimate = estimateStepSize(t, yT, fcnValue, &c, r.order)
+		stepEstimate = EstimateStepSize(t, yT, fcnValue, &c, r.Order)
 	}
 	var stepNext float64
 	// repeat until tend
@@ -69,7 +71,7 @@ func (r *rk) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statistics
 
 		// compute stages
 		var stg, id, ic uint
-		for stg = 1; stg < r.stages; stg++ {
+		for stg = 1; stg < r.Stages; stg++ {
 			tCurrent := t + stepNext*r.c[stg]
 
 			for id = 0; id < n; id++ {
@@ -90,7 +92,7 @@ func (r *rk) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statistics
 			yError[id] = stepNext * r.e[0] * fcnValue[id]
 		}
 
-		for stg = 1; stg < r.stages; stg++ {
+		for stg = 1; stg < r.Stages; stg++ {
 			for id = 0; id < n; id++ {
 				yError[id] = yError[id] + stepNext*r.e[stg]*ks[stg][id]
 			}
@@ -105,7 +107,7 @@ func (r *rk) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statistics
 		relativeError = math.Sqrt(relativeError / float64(n))
 
 		// new stepsize estimate
-		stepEstimate = 0.9 * math.Exp(-math.Log(1.0e-8+relativeError)/float64(r.order))
+		stepEstimate = 0.9 * math.Exp(-math.Log(1.0e-8+relativeError)/float64(r.Order))
 		stepEstimate = stepNext * math.Max(0.2, math.Min(stepEstimate, 2.0)) // safety interval
 
 		// reject step
@@ -123,7 +125,7 @@ func (r *rk) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statistics
 			for id = 0; id < n; id++ {
 				yT[id] = yT[id] + stepNext*r.b[0]*fcnValue[id]
 			}
-			for stg = 1; stg < r.stages; stg++ {
+			for stg = 1; stg < r.Stages; stg++ {
 				for id = 0; id < n; id++ {
 					yT[id] = yT[id] + stepNext*r.b[stg]*ks[stg][id]
 				}
@@ -134,7 +136,7 @@ func (r *rk) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statistics
 				break
 			} else {
 				if r.firstStageAsLast {
-					copy(fcnValue, ks[r.stages-1])
+					copy(fcnValue, ks[r.Stages-1])
 				} else {
 					c.Fcn(t, yT, fcnValue)
 					stat.EvaluationCount++

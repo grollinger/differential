@@ -1,6 +1,8 @@
-package solver
+package epp
 
 import (
+	. "github.com/rollingthunder/differential/ode"
+	. "github.com/rollingthunder/differential/ode/testing"
 	"github.com/rollingthunder/differential/problems"
 	"testing"
 )
@@ -8,7 +10,7 @@ import (
 func TestPeer(t *testing.T) {
 	peer, _ := NewPeer(EPP8_d)
 
-	testIntegrators(t, []Integrator{peer}, 1)
+	RunIntegratorTests(t, []Integrator{peer}, 1)
 }
 
 func TestAllPeer(t *testing.T) {
@@ -26,7 +28,7 @@ func TestAllPeer(t *testing.T) {
 		}
 	}
 
-	testIntegrators(t, integrators, iterationsPerTest)
+	RunIntegratorTests(t, integrators, 1)
 }
 
 func TestPeerBruss2D(t *testing.T) {

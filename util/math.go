@@ -1,7 +1,10 @@
 package util
 
-import "math"
-import "fmt"
+import (
+	"fmt"
+	"math"
+	"math/rand"
+)
 
 func Max(x, y int) int {
 	if x > y {
@@ -31,4 +34,8 @@ func ArrayEpsEquals(x, y []float64, eps float64) bool {
 
 func EpsEqual(x, y, eps float64) bool {
 	return math.Abs(x-y) < eps
+}
+
+func RandomInInterval(low, high float64) float64 {
+	return low + (rand.Float64() * (high - low))
 }

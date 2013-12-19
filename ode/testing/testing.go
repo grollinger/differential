@@ -1,8 +1,9 @@
-package solver
+package testing
 
 import (
+	. "github.com/rollingthunder/differential/ode"
+	"github.com/rollingthunder/differential/util"
 	"math"
-	"math/rand"
 	"testing"
 )
 
@@ -35,28 +36,20 @@ func order4Deriv(t float64, y []float64, dy []float64) {
 }
 
 type IntegrationTest struct {
-	tMin, tMax float64
-	sol        solution
-	fcn        Function
-	order      uint
-	name       string
+	TMin, TMax float64
+	Sol        solution
+	Fcn        Function
+	Order      uint
+	Name       string
 }
 
-var integrationTests = []IntegrationTest{
+var IntegrationTests = []IntegrationTest{
 	{-10, 10, order2, order2Deriv, 2, "x^2"},
 	{-10, 10, order3, order3Deriv, 3, "x^3"},
 	{-10, 10, order4, order4Deriv, 4, "x^4"},
 }
 
-func randomInInterval(low, high float64) float64 {
-	return low + (rand.Float64() * (high - low))
-}
-
-func epsEqual(a, b, eps float64) bool {
-	return math.Abs(a-b) < eps
-}
-
-func testIntegrators(t *testing.T, methods []Integrator, iterations int) {
+func RunIntegratorTests(t *testing.T, methods []Integrator, iterations int) {
 	eps := 0.0001
 
 	for _, m := range methods {
@@ -67,23 +60,23 @@ func testIntegrators(t *testing.T, methods []Integrator, iterations int) {
 		info := m.Info()
 
 		if testing.Verbose() {
-			t.Logf("%s\tTest\tT0\tTE\tSteps\tReject\tEval\tLast h", info.name)
+			t.Logf("%s\tTest\tT0\tTE\tSteps\tReject\tEval\tLast h", info.Name)
 		}
 
-		for _, v := range integrationTests {
-			if v.order <= info.order {
+		for _, v := range IntegrationTests {
+			if v.Order <= info.Order {
 				for i := 0; i < iterations; i++ {
-					t0 := randomInInterval(v.tMin, v.tMax)
-					te := randomInInterval(t0, v.tMax)
-					y := v.sol(t0)
-					ye := v.sol(te)
+					t0 := util.RandomInInterval(v.TMin, v.TMax)
+					te := util.RandomInInterval(t0, v.TMax)
+					y := v.Sol(t0)
+					ye := v.Sol(te)
 
-					stat, err := m.Integrate(t0, te, y, Config{Fcn: v.fcn})
+					stat, err := m.Integrate(t0, te, y, Config{Fcn: v.Fcn})
 
-					if !epsEqual(stat.CurrentTime, te, eps) {
+					if !util.EpsEqual(stat.CurrentTime, te, eps) {
 						t.Errorf("Tried to integrate up to %f but only reached %f", te, stat.CurrentTime)
 					}
-					if !epsEqual(y[0], ye[0], eps) {
+					if !util.EpsEqual(y[0], ye[0], eps) {
 						t.Errorf("Expected %f but result was %f", ye[0], y[0])
 					}
 					if err != nil {
@@ -91,11 +84,11 @@ func testIntegrators(t *testing.T, methods []Integrator, iterations int) {
 					}
 					if testing.Verbose() {
 						t.Logf(" \t%s\t%.2f\t%.2f\t%d\t%d\t%d\t%.2f",
-							v.name, t0, te, stat.StepCount, stat.RejectedCount, stat.EvaluationCount, stat.LastStepSize)
+							v.Name, t0, te, stat.StepCount, stat.RejectedCount, stat.EvaluationCount, stat.LastStepSize)
 					}
 				}
 			} else {
-				t.Logf("Skipped Test %s for RKMethod %s, order too high", v.name, info.name)
+				t.Logf("Skipped Test %s for RKMethod %s, order too high", v.Name, info.Name)
 			}
 		}
 	}
