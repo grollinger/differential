@@ -34,19 +34,16 @@ type peerCoefficients struct {
 type integration struct {
 	Config
 	Statistics
-	fOld, fNew, yOld, yNew, pa                                                     [][]float64
-	errorFactors                                                                   []float64
-	t0, tCurrent, stepRatioMin, stepRatio, stepEstimate, stepCurrent, stepPrevious float64
-	n                                                                              uint
+	fOld, fNew, yOld, yNew, pa                                                 [][]float64
+	errorFactors                                                               []float64
+	tCurrent, stepRatioMin, stepRatio, stepEstimate, stepCurrent, stepPrevious float64
+	n                                                                          uint
 }
 
 func (p *peer) Integrate(t, tEnd float64, yT []float64, cfg Config) (s Statistics, err error) {
 	in := p.setupIntegration(t, tEnd, yT, cfg)
 
-	p.startupIntegration(&in)
-
-	// end of start interval
-	in.tCurrent = in.t0 + in.stepPrevious
+	in.tCurrent, in.stepPrevious = p.startupIntegration(&in, t)
 	in.stepEstimate = in.stepPrevious // continue with stepsize stepPrevious
 
 	// repeat until tend
@@ -145,12 +142,11 @@ func (p *peer) setupIntegration(t, tEnd float64, yT []float64, c Config) (i inte
 	copy(i.yOld[p.indexMinNode], yT)
 
 	i.stepRatioMin = 0.2
-	i.t0 = t
 
 	return
 }
 
-func (p *peer) startupIntegration(in *integration) {
+func (p *peer) startupIntegration(in *integration, t0 float64) (tCurrent, stepRelative float64) {
 	// startup with DOPRI
 	dopri, err := rk.NewRK(rk.DoPri5)
 	if err != nil {
@@ -158,17 +154,17 @@ func (p *peer) startupIntegration(in *integration) {
 		return
 	}
 
-	in.Fcn(in.t0, in.yOld[p.indexMinNode], in.fOld[p.indexMinNode])
+	in.Fcn(t0, in.yOld[p.indexMinNode], in.fOld[p.indexMinNode])
 	in.EvaluationCount = 1
 
 	// guess initial step size if unspecified
 	in.stepEstimate = in.InitialStepSize
 	if in.stepEstimate <= 0.0 {
-		in.stepEstimate = EstimateStepSize(in.t0, in.yOld[p.indexMinNode], in.fOld[p.indexMinNode], &in.Config, p.Order)
+		in.stepEstimate = EstimateStepSize(t0, in.yOld[p.indexMinNode], in.fOld[p.indexMinNode], &in.Config, p.Order)
 	}
 
 	copy(in.yOld[p.indexMaxNode], in.yOld[p.indexMinNode])
-	tCurrent := in.t0
+	tCurrent = t0
 
 	//  higher accuracy for starting proc
 	rkConfig := Config{
@@ -179,7 +175,7 @@ func (p *peer) startupIntegration(in *integration) {
 		Fcn:               in.Fcn,
 	}
 
-	rkStat, err := dopri.Integrate(tCurrent, in.t0+in.stepEstimate, in.yOld[p.indexMaxNode], rkConfig)
+	rkStat, err := dopri.Integrate(tCurrent, t0+in.stepEstimate, in.yOld[p.indexMaxNode], rkConfig)
 	if err != nil {
 		err = errors.New("error during startup: " + err.Error())
 		return
@@ -191,18 +187,18 @@ func (p *peer) startupIntegration(in *integration) {
 	in.EvaluationCount++
 
 	// adjusted step size, relative to interval [0,1]:
-	in.stepPrevious = (tCurrent - in.t0) / (p.c[p.indexMaxNode] - p.c[p.indexMinNode])
-	origT0 := in.t0
-	in.t0 -= in.stepPrevious * p.c[p.indexMinNode] // corresponds to node pc=0
+	stepRelative = (tCurrent - t0) / (p.c[p.indexMaxNode] - p.c[p.indexMinNode])
+
+	tBase := t0 - stepRelative*p.c[p.indexMinNode] // corresponds to node pc=0
 
 	// startup procedure
 	var stg uint
 	for stg = 0; stg < p.Stages; stg++ {
 		if stg != p.indexMinNode && stg != p.indexMaxNode {
 			copy(in.yOld[stg], in.yOld[p.indexMinNode])
-			rkConfig.InitialStepSize = in.stepPrevious * (p.c[stg] - p.c[p.indexMinNode])
-			tStage := in.t0 + in.stepPrevious*p.c[stg]
-			rkStat, err = dopri.Integrate(origT0, tStage, in.yOld[stg], rkConfig)
+			rkConfig.InitialStepSize = stepRelative * (p.c[stg] - p.c[p.indexMinNode])
+			tStage := tBase + stepRelative*p.c[stg]
+			rkStat, err = dopri.Integrate(t0, tStage, in.yOld[stg], rkConfig)
 			if err != nil {
 				err = errors.New("error during startup: " + err.Error())
 				return
@@ -211,6 +207,9 @@ func (p *peer) startupIntegration(in *integration) {
 			in.EvaluationCount += rkStat.EvaluationCount + 1
 		}
 	}
+
+	tCurrent = tBase + stepRelative
+	return
 }
 
 func (p *peer) computeCoefficients(in *integration) {

@@ -18,7 +18,8 @@ func setupBenchmark() (p *peer, in integration, y0 []float64) {
 	}
 
 	in = p.setupIntegration(0.0, 1.0, y0, cfg)
-	p.startupIntegration(&in)
+	in.tCurrent, in.stepPrevious = p.startupIntegration(&in, 0.0)
+	in.stepEstimate = in.stepPrevious
 	return
 }
 
