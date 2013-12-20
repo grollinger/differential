@@ -34,90 +34,42 @@ type peerCoefficients struct {
 type integration struct {
 	Config
 	Statistics
-	fOld, fNew, yOld, yNew, pa                              [][]float64
-	yf                                                      []float64
-	t0, stepRatioMin, stepRatio, stepEstimate, stepPrevious float64
-	n                                                       uint
+	fOld, fNew, yOld, yNew, pa                                                     [][]float64
+	errorFactors                                                                   []float64
+	t0, tCurrent, stepRatioMin, stepRatio, stepEstimate, stepCurrent, stepPrevious float64
+	n                                                                              uint
 }
 
-func (p *peer) Integrate(t, tEnd float64, yT []float64, cfg Config) (stat Statistics, err error) {
+func (p *peer) Integrate(t, tEnd float64, yT []float64, cfg Config) (s Statistics, err error) {
 	in := p.setupIntegration(t, tEnd, yT, cfg)
 
 	p.startupIntegration(&in)
 
 	// end of start interval
-	t = in.t0 + in.stepPrevious
+	in.tCurrent = in.t0 + in.stepPrevious
 	in.stepEstimate = in.stepPrevious // continue with stepsize stepPrevious
 
-	var stepNext float64
 	// repeat until tend
-	for t < (tEnd - in.AbsoluteTolerance) {
-		if t+in.stepEstimate > tEnd {
-			in.stepEstimate = tEnd - t
+	for in.tCurrent < (tEnd - in.AbsoluteTolerance) {
+		if in.tCurrent+in.stepEstimate > tEnd {
+			in.stepEstimate = tEnd - in.tCurrent
 		}
-		stepNext = in.stepEstimate
-
-		stat.StepCount++
-		in.stepRatio = stepNext / in.stepPrevious
+		in.stepCurrent = in.stepEstimate
+		in.StepCount++
 
 		p.computeCoefficients(&in)
 
-		// STAGE SOLUTIONS -> "St" Prefix
-		var stg, ic, id uint
-		// Loops: StB
-		for id = 0; id < in.n; id++ {
-			for stg = 0; stg < p.Stages; stg++ {
-				in.yNew[stg][id] = 0.0
-				/*@; BEGIN(StB=Nest) @*/
-				for ic = 0; ic < p.Stages; ic++ {
-					in.yNew[stg][id] += p.b[stg][ic] * in.yOld[ic][id]
-				}
-			}
-		}
+		p.computeStages(&in)
 
-		for id = 0; id < in.n; id++ {
-			for stg = 0; stg < p.Stages; stg++ {
-				for ic = 0; ic < p.Stages; ic++ {
-					in.yNew[stg][id] += in.pa[stg][ic] * in.fOld[ic][id]
-				}
-			}
-		}
+		p.computeEvaluations(&in)
 
-		// FUNCTION EVALUATIONS
-		// Fn=fcn(Yn)
-		// Candidate for Parallelisation
-		for stg = 0; stg < p.Stages; stg++ {
-			in.Fcn(t+stepNext*p.c[stg], in.yNew[stg], in.fNew[stg])
-		}
-
-		stat.EvaluationCount += p.Stages
-
-		// compute error estimate with fNew:
-		for id = 0; id < in.n; id++ {
-			rc := 0.0
-			for stg = 0; stg < p.Stages; stg++ {
-				rc += p.errorModelWeights[stg] * in.fNew[stg][id]
-			}
-			in.yf[id] = math.Pow(rc/(in.AbsoluteTolerance+in.RelativeTolerance*math.Abs(in.yOld[p.Stages-1][id])), 2.0)
-		}
-
-		// compute error quotient/20070803
-		// step ratio from error model ((1+a)^p-a^p)/est+a^p)^(1/p)-a, p=order/2:
-		errorRelative := 0.0
-		for id = 0; id < in.n; id++ {
-			errorRelative += in.yf[id]
-		}
-
-		errorEstimate := stepNext*math.Sqrt(errorRelative/float64(in.n)) + 1e-8
-		errorModelDenom := math.Pow(math.Pow(in.stepRatio, 2.0)+p.errorModelA, float64(p.Order)/2.0) - p.errorModelA0
-		in.stepEstimate = math.Pow(errorModelDenom/errorEstimate+p.errorModelA0, 2.0/float64(p.Order)) - p.errorModelA
-		in.stepEstimate = in.stepPrevious * math.Max(in.stepRatioMin, math.Min(0.95*math.Sqrt(in.stepEstimate), p.stepRatioMax)) // safety interval
+		errorEstimate := p.computeErrorModel(&in)
 
 		if errorEstimate > 1.0 {
 			// reject step
 			// decrease minimal stepsize ratio
 			in.stepRatioMin = in.stepRatioMin * 0.2
-			stat.RejectedCount++
+			in.RejectedCount++
 
 			// report failure
 			if in.stepEstimate < in.MinStepSize {
@@ -137,12 +89,12 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, cfg Config) (stat Statis
 			in.fOld = in.fNew
 			in.fNew = swap
 
-			t = t + stepNext
-			in.stepPrevious = stepNext
+			in.tCurrent += in.stepCurrent
+			in.stepPrevious = in.stepCurrent
 		}
 
 		// failure, too many steps
-		if stat.StepCount > in.MaxStepCount {
+		if in.StepCount > in.MaxStepCount {
 			err = errors.New("maximum step count exceeded")
 			break
 		}
@@ -150,9 +102,11 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, cfg Config) (stat Statis
 	// output of last stage is the final output
 	copy(yT, in.yOld[p.Stages-1])
 
-	stat.CurrentTime = t
-	stat.LastStepSize = in.stepPrevious
-	stat.NextStepSize = in.stepEstimate
+	in.CurrentTime = in.tCurrent
+	in.LastStepSize = in.stepPrevious
+	in.NextStepSize = in.stepEstimate
+
+	s = in.Statistics
 	return
 }
 
@@ -180,7 +134,7 @@ func (p *peer) setupIntegration(t, tEnd float64, yT []float64, c Config) (i inte
 	i.n = uint(len(yT))
 
 	// allocate temp matrices
-	i.yf = make([]float64, i.n)
+	i.errorFactors = make([]float64, i.n)
 	i.pa = util.MakeSquare(p.Stages)
 
 	i.yNew = util.MakeRectangular(p.Stages, i.n)
@@ -260,6 +214,8 @@ func (p *peer) startupIntegration(in *integration) {
 }
 
 func (p *peer) computeCoefficients(in *integration) {
+	in.stepRatio = in.stepCurrent / in.stepPrevious
+
 	// COMPUTE COEFFS -> "Co" Prefix
 	// stepPrevious*A row-wise
 	// Loops: CoStages( CoA0, CoA1 )
@@ -280,4 +236,65 @@ func (p *peer) computeCoefficients(in *integration) {
 			}
 		}
 	}
+}
+
+func (p *peer) computeStages(in *integration) {
+	// STAGE SOLUTIONS -> "St" Prefix
+	var stg, ic, id uint
+	// Loops: StB
+	for id = 0; id < in.n; id++ {
+		for stg = 0; stg < p.Stages; stg++ {
+			in.yNew[stg][id] = 0.0
+			/*@; BEGIN(StB=Nest) @*/
+			for ic = 0; ic < p.Stages; ic++ {
+				in.yNew[stg][id] += p.b[stg][ic] * in.yOld[ic][id]
+			}
+		}
+	}
+
+	for id = 0; id < in.n; id++ {
+		for stg = 0; stg < p.Stages; stg++ {
+			for ic = 0; ic < p.Stages; ic++ {
+				in.yNew[stg][id] += in.pa[stg][ic] * in.fOld[ic][id]
+			}
+		}
+	}
+}
+
+func (p *peer) computeEvaluations(in *integration) {
+	// FUNCTION EVALUATIONS
+	// Fn=fcn(Yn)
+	var stg uint
+	// Candidate for Parallelisation
+	for stg = 0; stg < p.Stages; stg++ {
+		in.Fcn(in.tCurrent+in.stepEstimate*p.c[stg], in.yNew[stg], in.fNew[stg])
+	}
+
+	in.EvaluationCount += p.Stages
+}
+
+func (p *peer) computeErrorModel(in *integration) (errorEstimate float64) {
+	var id, stg uint
+	// compute error estimate with fNew:
+	for id = 0; id < in.n; id++ {
+		rc := 0.0
+		for stg = 0; stg < p.Stages; stg++ {
+			rc += p.errorModelWeights[stg] * in.fNew[stg][id]
+		}
+		in.errorFactors[id] = math.Pow(rc/(in.AbsoluteTolerance+in.RelativeTolerance*math.Abs(in.yOld[p.Stages-1][id])), 2.0)
+	}
+
+	// compute error quotient/20070803
+	// step ratio from error model ((1+a)^p-a^p)/est+a^p)^(1/p)-a, p=order/2:
+	errorRelative := 0.0
+	for id = 0; id < in.n; id++ {
+		errorRelative += in.errorFactors[id]
+	}
+
+	errorEstimate = in.stepEstimate*math.Sqrt(errorRelative/float64(in.n)) + 1e-8
+	errorModelDenom := math.Pow(math.Pow(in.stepRatio, 2.0)+p.errorModelA, float64(p.Order)/2.0) - p.errorModelA0
+	errorStepRatio := math.Pow(errorModelDenom/errorEstimate+p.errorModelA0, 2.0/float64(p.Order)) - p.errorModelA
+	in.stepEstimate = in.stepPrevious * math.Max(in.stepRatioMin, math.Min(0.95*math.Sqrt(errorStepRatio), p.stepRatioMax)) // safety interval
+
+	return
 }

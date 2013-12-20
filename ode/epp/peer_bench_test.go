@@ -18,7 +18,7 @@ func setupBenchmark() (p *peer, in integration, y0 []float64) {
 	}
 
 	in = p.setupIntegration(0.0, 1.0, y0, cfg)
-
+	p.startupIntegration(&in)
 	return
 }
 
@@ -29,5 +29,44 @@ func BenchmarkCoefficients(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		p.computeCoefficients(&in)
+	}
+}
+
+func BenchmarkStages(b *testing.B) {
+	p, in, _ := setupBenchmark()
+
+	p.computeCoefficients(&in)
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		p.computeStages(&in)
+	}
+}
+
+func BenchmarkEvaluations(b *testing.B) {
+	p, in, _ := setupBenchmark()
+
+	p.computeCoefficients(&in)
+	p.computeStages(&in)
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		p.computeEvaluations(&in)
+	}
+}
+
+func BenchmarkErrorModel(b *testing.B) {
+	p, in, _ := setupBenchmark()
+
+	p.computeCoefficients(&in)
+	p.computeStages(&in)
+	p.computeEvaluations(&in)
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		p.computeErrorModel(&in)
 	}
 }
