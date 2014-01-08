@@ -41,7 +41,7 @@ type integration struct {
 }
 
 func (p *peer) Integrate(t, tEnd float64, yT []float64, cfg *Config) (s Statistics, err error) {
-	err = validateConfig(cfg)
+	err = cfg.ValidateAndPrepare()
 
 	if err != nil {
 		return
@@ -113,27 +113,12 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, cfg *Config) (s Statisti
 	return
 }
 
-func validateConfig(c *Config) error {
-	if c.FcnBlocked == nil && c.Fcn == nil {
-		return errors.New("no evalution function specified")
-	}
-	return nil
-}
-
 func (p *peer) setupIntegration(t, tEnd float64, yT []float64, c *Config) (i integration) {
 	i.n = uint(len(yT))
 
-	if c.BlockSize == 0 || c.BlockSize > i.n {
-		c.BlockSize = i.n
-	}
+	c.CorrectBlockSize(i.n)
 
 	i.Config = *c
-
-	if i.FcnBlocked == nil {
-		i.FcnBlocked = func(startIdx, blockSize uint, t float64, yT []float64, dy_out []float64) {
-			i.Fcn(t, yT, dy_out)
-		}
-	}
 
 	// set default parameters if necessary
 	if i.MaxStepSize <= 0.0 {

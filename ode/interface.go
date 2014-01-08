@@ -1,5 +1,9 @@
 package ode
 
+import (
+	"errors"
+)
+
 type Function func(t float64, yT []float64, dy_out []float64)
 type BlockFunction func(startIdx, blockSize uint, t float64, yT []float64, dy_out []float64)
 
@@ -70,6 +74,30 @@ type Integrator interface {
 type IntegratorInfo struct {
 	Name          string
 	Stages, Order uint
+}
+
+func (c *Config) ValidateAndPrepare() error {
+	if c == nil {
+		return errors.New("nil configuration")
+	}
+
+	if c.FcnBlocked == nil && c.Fcn == nil {
+		return errors.New("no evalution function specified")
+	}
+
+	if c.FcnBlocked == nil {
+		c.FcnBlocked = func(startIdx, blockSize uint, t float64, yT []float64, dy_out []float64) {
+			c.Fcn(t, yT, dy_out)
+		}
+	}
+
+	return nil
+}
+
+func (c *Config) CorrectBlockSize(maxBlockSize uint) {
+	if c.BlockSize == 0 || c.BlockSize > maxBlockSize {
+		c.BlockSize = maxBlockSize
+	}
 }
 
 func (i *IntegratorInfo) Info() IntegratorInfo {

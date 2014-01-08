@@ -19,6 +19,16 @@ type rk struct {
 
 //-- performs Runge-Kutta integration
 func (r *rk) Integrate(t, tEnd float64, yT []float64, c *Config) (stat Statistics, err error) {
+	err = c.ValidateAndPrepare()
+
+	if err != nil {
+		return
+	}
+
+	var n uint = uint(len(yT))
+
+	c.CorrectBlockSize(n)
+
 	// set default parameters if necessary
 	if c.MaxStepSize <= 0.0 {
 		c.MaxStepSize = tEnd - t
@@ -40,9 +50,6 @@ func (r *rk) Integrate(t, tEnd float64, yT []float64, c *Config) (stat Statistic
 		err = errors.New("RK Method coefficients not initialized")
 		return
 	}
-
-	// local variables
-	var n uint = uint(len(yT))
 
 	// allocate temp matrices
 	fcnValue := make([]float64, n)
@@ -83,8 +90,12 @@ func (r *rk) Integrate(t, tEnd float64, yT []float64, c *Config) (stat Statistic
 					yCurrent[id] = yCurrent[id] + stepNext*r.a[stg][ic]*ks[ic][id]
 				}
 			}
-			c.Fcn(tCurrent, yCurrent, ks[stg])
-			stat.EvaluationCount++
+
+			var block uint
+			for block = 0; block < n; block += c.BlockSize {
+				c.FcnBlocked(block, c.BlockSize, tCurrent, yCurrent, ks[stg])
+				stat.EvaluationCount++
+			}
 		}
 
 		// compute error estimate:

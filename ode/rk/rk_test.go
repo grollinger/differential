@@ -37,7 +37,7 @@ func TestRKMBody4h(t *testing.T) {
 	}
 	t0, te := 0.0, 0.1
 
-	stat, err := peer.Integrate(t0, te, instance, config)
+	stat, err := peer.Integrate(t0, te, instance, &config)
 
 	if err != nil {
 		t.Fatalf("Integration failed - %s", err.Error())
