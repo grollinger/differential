@@ -270,10 +270,12 @@ func (p *peer) computeStages(in *integration) {
 func (p *peer) computeEvaluations(in *integration) {
 	// FUNCTION EVALUATIONS
 	// Fn=fcn(Yn)
-	var stg uint
+	var stg, block uint
 	// Candidate for Parallelisation
 	for stg = 0; stg < p.Stages; stg++ {
-		in.Fcn(in.tCurrent+in.stepEstimate*p.c[stg], in.yNew[stg], in.fNew[stg])
+		for block = 0; block < in.n; block += in.BlockSize {
+			in.FcnBlocked(block, in.BlockSize, in.tCurrent+in.stepEstimate*p.c[stg], in.yNew[stg], in.fNew[stg])
+		}
 	}
 
 	in.EvaluationCount += p.Stages

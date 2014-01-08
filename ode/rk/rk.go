@@ -94,8 +94,8 @@ func (r *rk) Integrate(t, tEnd float64, yT []float64, c *Config) (stat Statistic
 			var block uint
 			for block = 0; block < n; block += c.BlockSize {
 				c.FcnBlocked(block, c.BlockSize, tCurrent, yCurrent, ks[stg])
-				stat.EvaluationCount++
 			}
+			stat.EvaluationCount++
 		}
 
 		// compute error estimate:
