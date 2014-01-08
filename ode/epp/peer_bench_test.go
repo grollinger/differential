@@ -17,6 +17,8 @@ func setupBenchmark() (p *peer, in integration, y0 []float64) {
 		Fcn: brus.Fcn,
 	}
 
+	cfg.ValidateAndPrepare()
+
 	in = p.setupIntegration(0.0, 1.0, y0, &cfg)
 	in.tCurrent, in.stepPrevious = p.startupIntegration(&in, 0.0)
 	in.stepEstimate = in.stepPrevious
