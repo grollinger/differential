@@ -41,7 +41,7 @@ type integration struct {
 }
 
 func (p *peer) Integrate(t, tEnd float64, yT []float64, cfg *Config) (s Statistics, err error) {
-	err = cfg.ValidateAndPrepare()
+	err = cfg.ValidateAndPrepare(uint(len(yT)))
 
 	if err != nil {
 		return
@@ -116,8 +116,6 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, cfg *Config) (s Statisti
 func (p *peer) setupIntegration(t, tEnd float64, yT []float64, c *Config) (i integration) {
 	i.n = uint(len(yT))
 
-	c.CorrectBlockSize(i.n)
-
 	// set default parameters if necessary
 	if c.MaxStepSize <= 0.0 {
 		c.MaxStepSize = tEnd - t
@@ -180,6 +178,7 @@ func (p *peer) startupIntegration(in *integration, t0 float64) (tCurrent, stepRe
 		AbsoluteTolerance: math.Max(1e-1*in.AbsoluteTolerance, 1e-14),
 		OneStepOnly:       true,
 		Fcn:               in.Fcn,
+		FcnBlocked:        in.FcnBlocked,
 	}
 
 	rkStat, err := dopri.Integrate(tCurrent, t0+in.stepEstimate, in.yOld[p.indexMaxNode], &rkConfig)

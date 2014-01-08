@@ -19,15 +19,13 @@ type rk struct {
 
 //-- performs Runge-Kutta integration
 func (r *rk) Integrate(t, tEnd float64, yT []float64, c *Config) (stat Statistics, err error) {
-	err = c.ValidateAndPrepare()
+	var n uint = uint(len(yT))
+
+	err = c.ValidateAndPrepare(n)
 
 	if err != nil {
 		return
 	}
-
-	var n uint = uint(len(yT))
-
-	c.CorrectBlockSize(n)
 
 	// set default parameters if necessary
 	if c.MaxStepSize <= 0.0 {
