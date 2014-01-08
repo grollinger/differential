@@ -89,6 +89,10 @@ func (c *Config) ValidateAndPrepare() error {
 		c.FcnBlocked = func(startIdx, blockSize uint, t float64, yT []float64, dy_out []float64) {
 			c.Fcn(t, yT, dy_out)
 		}
+	} else if c.Fcn == nil {
+		c.Fcn = func(t float64, yT []float64, dy_out []float64) {
+			c.FcnBlocked(0, uint(len(yT)), t, yT, dy_out)
+		}
 	}
 
 	return nil

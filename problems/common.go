@@ -11,3 +11,8 @@ type Problem interface {
 	Initialize() []float64
 	Fcn(t float64, yT []float64, dy_out []float64)
 }
+
+type TiledProblem interface {
+	Problem
+	FcnBlock(startIdx, blockSize uint, t float64, yT []float64, dy_out []float64)
+}

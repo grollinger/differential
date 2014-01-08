@@ -47,7 +47,7 @@ func BenchmarkStages(b *testing.B) {
 	}
 }
 
-func BenchmarkEvaluations(b *testing.B) {
+func BenchmarkEvaluations_NonBlocked(b *testing.B) {
 	p, in, _ := setupBenchmark()
 
 	p.computeCoefficients(&in)

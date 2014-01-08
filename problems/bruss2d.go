@@ -46,7 +46,7 @@ func (b *brusselator) Initialize() (grid []float64) {
 	return
 }
 
-func (b *brusselator) Fcn(t float64, yT []float64, dy_out []float64) {
+func (b *brusselator) FcnCorrect(t float64, yT []float64, dy_out []float64) {
 	// TODO validate input
 
 	for index := 0; index < b.cellcount; index++ {
@@ -84,7 +84,11 @@ func (b *brusselator) Fcn(t float64, yT []float64, dy_out []float64) {
 // alpha = 0.002
 // u[0, x, y] = 2 + 0.25y
 // v(0, x, y) = 1 + 0.8x
-func NewBruss2D(N int) Problem {
+func NewBruss2D(N int) TiledProblem {
+	if N <= 0 {
+		return nil
+	}
+
 	var b brusselator
 	b.a, b.b, b.n = 3.4, 1.0, N
 	b.cellcount = N * N
@@ -92,6 +96,10 @@ func NewBruss2D(N int) Problem {
 	n1 := float64(N) - 1.0
 	b.a1, b.alphaN1Squared = b.a+1.0, b.alpha*n1*n1
 	return &b
+}
+
+func (b *brusselator) Fcn(t float64, yT []float64, dy_out []float64) {
+	b.FcnBlock(0, uint(len(yT)), t, yT, dy_out)
 }
 
 func (b *brusselator) FcnBlock(startIdx, blockSize uint, t float64, yT []float64, dy_out []float64) {
