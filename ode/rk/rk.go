@@ -18,7 +18,7 @@ type rk struct {
 }
 
 //-- performs Runge-Kutta integration
-func (r *rk) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statistics, err error) {
+func (r *rk) Integrate(t, tEnd float64, yT []float64, c *Config) (stat Statistics, err error) {
 	// set default parameters if necessary
 	if c.MaxStepSize <= 0.0 {
 		c.MaxStepSize = tEnd - t
@@ -56,7 +56,7 @@ func (r *rk) Integrate(t, tEnd float64, yT []float64, c Config) (stat Statistics
 	// compute initial step size if not set
 	stepEstimate := c.InitialStepSize
 	if stepEstimate <= 0.0 {
-		stepEstimate = EstimateStepSize(t, yT, fcnValue, &c, r.Order)
+		stepEstimate = EstimateStepSize(t, yT, fcnValue, c, r.Order)
 	}
 	var stepNext float64
 	// repeat until tend

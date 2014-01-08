@@ -40,7 +40,13 @@ type integration struct {
 	n                                                                          uint
 }
 
-func (p *peer) Integrate(t, tEnd float64, yT []float64, cfg Config) (s Statistics, err error) {
+func (p *peer) Integrate(t, tEnd float64, yT []float64, cfg *Config) (s Statistics, err error) {
+	err = validateConfig(cfg)
+
+	if err != nil {
+		return
+	}
+
 	in := p.setupIntegration(t, tEnd, yT, cfg)
 
 	in.tCurrent, in.stepPrevious = p.startupIntegration(&in, t)
@@ -107,8 +113,27 @@ func (p *peer) Integrate(t, tEnd float64, yT []float64, cfg Config) (s Statistic
 	return
 }
 
-func (p *peer) setupIntegration(t, tEnd float64, yT []float64, c Config) (i integration) {
-	i.Config = c
+func validateConfig(c *Config) error {
+	if c.FcnBlocked == nil && c.Fcn == nil {
+		return errors.New("no evalution function specified")
+	}
+	return nil
+}
+
+func (p *peer) setupIntegration(t, tEnd float64, yT []float64, c *Config) (i integration) {
+	i.n = uint(len(yT))
+
+	if c.BlockSize == 0 || c.BlockSize > i.n {
+		c.BlockSize = i.n
+	}
+
+	i.Config = *c
+
+	if i.FcnBlocked == nil {
+		i.FcnBlocked = func(startIdx, blockSize uint, t float64, yT []float64, dy_out []float64) {
+			i.Fcn(t, yT, dy_out)
+		}
+	}
 
 	// set default parameters if necessary
 	if i.MaxStepSize <= 0.0 {
@@ -126,9 +151,6 @@ func (p *peer) setupIntegration(t, tEnd float64, yT []float64, c Config) (i inte
 	if i.RelativeTolerance <= 0.0 {
 		i.RelativeTolerance = i.AbsoluteTolerance
 	}
-
-	// local variables
-	i.n = uint(len(yT))
 
 	// allocate temp matrices
 	i.errorFactors = make([]float64, i.n)
@@ -175,7 +197,7 @@ func (p *peer) startupIntegration(in *integration, t0 float64) (tCurrent, stepRe
 		Fcn:               in.Fcn,
 	}
 
-	rkStat, err := dopri.Integrate(tCurrent, t0+in.stepEstimate, in.yOld[p.indexMaxNode], rkConfig)
+	rkStat, err := dopri.Integrate(tCurrent, t0+in.stepEstimate, in.yOld[p.indexMaxNode], &rkConfig)
 	if err != nil {
 		err = errors.New("error during startup: " + err.Error())
 		return
@@ -198,7 +220,7 @@ func (p *peer) startupIntegration(in *integration, t0 float64) (tCurrent, stepRe
 			copy(in.yOld[stg], in.yOld[p.indexMinNode])
 			rkConfig.InitialStepSize = stepRelative * (p.c[stg] - p.c[p.indexMinNode])
 			tStage := tBase + stepRelative*p.c[stg]
-			rkStat, err = dopri.Integrate(t0, tStage, in.yOld[stg], rkConfig)
+			rkStat, err = dopri.Integrate(t0, tStage, in.yOld[stg], &rkConfig)
 			if err != nil {
 				err = errors.New("error during startup: " + err.Error())
 				return
@@ -276,7 +298,7 @@ func (p *peer) computeErrorModel(in *integration) (errorEstimate float64) {
 	var id, stg uint
 	// compute error estimate with fNew:
 	for id = 0; id < in.n; id++ {
-		rc := 0.0
+		var rc float64 = 0.0
 		for stg = 0; stg < p.Stages; stg++ {
 			rc += p.errorModelWeights[stg] * in.fNew[stg][id]
 		}

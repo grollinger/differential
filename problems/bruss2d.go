@@ -94,7 +94,7 @@ func NewBruss2D(N int) Problem {
 	return &b
 }
 
-func (b *brusselator) FcnBlock(startIdx, blockSize int, t float64, yT []float64, dy_out []float64) {
+func (b *brusselator) FcnBlock(startIdx, blockSize uint, t float64, yT []float64, dy_out []float64) {
 	var lo, hi int
 	var loX, loY, hiX int
 
@@ -105,15 +105,15 @@ func (b *brusselator) FcnBlock(startIdx, blockSize int, t float64, yT []float64,
 	// (don't calculate u_i,j and v_i,j in separate blocks)
 	if (blockSize % 2) == 1 {
 		if (startIdx % 2) == 0 { // == 0 because of 0 based arrays...
-			lo = startIdx
-			hi = startIdx + blockSize
+			lo = int(startIdx)
+			hi = int(startIdx + blockSize)
 		} else {
-			lo = startIdx + 1
-			hi = startIdx + blockSize - 1
+			lo = int(startIdx + 1)
+			hi = int(startIdx + blockSize - 1)
 		}
 	} else {
-		lo = startIdx
-		hi = startIdx + blockSize - 1
+		lo = int(startIdx)
+		hi = int(startIdx + blockSize - 1)
 	}
 
 	// Force end of the last block to

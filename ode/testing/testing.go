@@ -50,7 +50,7 @@ var IntegrationTests = []IntegrationTest{
 }
 
 func RunIntegratorTests(t *testing.T, methods []Integrator, iterations int) {
-	eps := 0.0001
+	var eps float64 = 0.0001
 
 	for _, m := range methods {
 		if m == nil {
@@ -71,7 +71,7 @@ func RunIntegratorTests(t *testing.T, methods []Integrator, iterations int) {
 					y := v.Sol(t0)
 					ye := v.Sol(te)
 
-					stat, err := m.Integrate(t0, te, y, Config{Fcn: v.Fcn})
+					stat, err := m.Integrate(t0, te, y, &Config{Fcn: v.Fcn})
 
 					if !util.EpsEqual(stat.CurrentTime, te, eps) {
 						t.Errorf("Tried to integrate up to %f but only reached %f", te, stat.CurrentTime)

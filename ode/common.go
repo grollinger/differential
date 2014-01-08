@@ -10,7 +10,7 @@ func EstimateStepSize(t float64, yT, fcnValue []float64, c *Config, order uint) 
 	y2, f2 := make([]float64, n), make([]float64, n)
 
 	// calculate temp step size
-	dnf, dny := 0.0, 0.0
+	var dnf, dny float64 = 0.0, 0.0
 	for id := 0; id < n; id++ {
 		rc := c.AbsoluteTolerance + c.RelativeTolerance*math.Abs(yT[id])
 		dnf = dnf + math.Pow(fcnValue[id]/rc, 2)

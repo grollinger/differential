@@ -1,7 +1,7 @@
 package ode
 
 type Function func(t float64, yT []float64, dy_out []float64)
-type BlockFunction func(startIdx, blockSize int, t float64, yT []float64, dy_out []float64)
+type BlockFunction func(startIdx, blockSize uint, t float64, yT []float64, dy_out []float64)
 
 type Config struct {
 	// InitialStepSize, if > 0.0 specifies the step size
@@ -29,6 +29,12 @@ type Config struct {
 	// OneStepOnly, if set, causes the Integrator to stop processing
 	// after the first integration step was performed
 	OneStepOnly bool
+
+	// BlockSize if > 0 and <= n specifies how many entries of the system are evaluated in one go
+	// must be <= n (the system size)
+	// If 0, this will be forced to n
+	// If FcnBlocked is unset, this will be forced to n
+	BlockSize uint
 
 	// Fcn or FcnBlocked contain the expression that should be evaluated for
 	// the right hand side of the differential equation
@@ -58,7 +64,7 @@ type Statistics struct {
 
 type Integrator interface {
 	Info() IntegratorInfo
-	Integrate(t, tEnd float64, yT []float64, config Config) (stat Statistics, err error)
+	Integrate(t, tEnd float64, yT []float64, config *Config) (stat Statistics, err error)
 }
 
 type IntegratorInfo struct {

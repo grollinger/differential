@@ -7,6 +7,23 @@ import (
 	"testing"
 )
 
+func TestParameterValidation(t *testing.T) {
+	peer, _ := NewPeer(EPP8_d)
+	bruss := problems.NewBruss2D(10)
+	instance := bruss.Initialize()
+
+	c := Config{
+		BlockSize: 0,
+		Fcn:       bruss.Fcn,
+	}
+
+	peer.Integrate(0, 1, instance, &c)
+
+	if c.BlockSize == 0 {
+		t.Errorf("Peer didn't correct block size.")
+	}
+}
+
 func TestPeer(t *testing.T) {
 	peer, _ := NewPeer(EPP8_d)
 
@@ -40,7 +57,7 @@ func TestPeerBruss2D(t *testing.T) {
 		Fcn: bruss.Fcn,
 	}
 
-	peer.Integrate(0, 1, instance, config)
+	peer.Integrate(0, 1, instance, &config)
 }
 
 func TestPeerMBody4h(t *testing.T) {
@@ -53,9 +70,9 @@ func TestPeerMBody4h(t *testing.T) {
 		AbsoluteTolerance: 1.e-5,
 		RelativeTolerance: 1.e-5,
 	}
-	t0, te := 0.0, 0.1
+	var t0, te float64 = 0.0, 0.1
 
-	stat, err := peer.Integrate(t0, te, instance, config)
+	stat, err := peer.Integrate(t0, te, instance, &config)
 
 	if err != nil {
 		t.Fatalf("Integration failed - %s", err.Error())
