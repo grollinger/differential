@@ -118,24 +118,24 @@ func (p *peer) setupIntegration(t, tEnd float64, yT []float64, c *Config) (i int
 
 	c.CorrectBlockSize(i.n)
 
-	i.Config = *c
-
 	// set default parameters if necessary
-	if i.MaxStepSize <= 0.0 {
-		i.MaxStepSize = tEnd - t
+	if c.MaxStepSize <= 0.0 {
+		c.MaxStepSize = tEnd - t
 	}
-	if i.MinStepSize <= 0.0 {
-		i.MinStepSize = 1e-10
+	if c.MinStepSize <= 0.0 {
+		c.MinStepSize = 1e-10
 	}
-	if i.MaxStepCount == 0 {
-		i.MaxStepCount = 1000000
+	if c.MaxStepCount == 0 {
+		c.MaxStepCount = 1000000
 	}
-	if i.AbsoluteTolerance <= 0.0 {
-		i.AbsoluteTolerance = 1e-4
+	if c.AbsoluteTolerance <= 0.0 {
+		c.AbsoluteTolerance = 1e-4
 	}
-	if i.RelativeTolerance <= 0.0 {
-		i.RelativeTolerance = i.AbsoluteTolerance
+	if c.RelativeTolerance <= 0.0 {
+		c.RelativeTolerance = c.AbsoluteTolerance
 	}
+
+	i.Config = *c
 
 	// allocate temp matrices
 	i.errorFactors = make([]float64, i.n)
@@ -246,22 +246,29 @@ func (p *peer) computeCoefficients(in *integration) {
 
 func (p *peer) computeStages(in *integration) {
 	// STAGE SOLUTIONS -> "St" Prefix
-	var stg, ic, id uint
-	// Loops: StB
-	for id = 0; id < in.n; id++ {
-		for stg = 0; stg < p.Stages; stg++ {
-			in.yNew[stg][id] = 0.0
-			/*@; BEGIN(StB=Nest) @*/
-			for ic = 0; ic < p.Stages; ic++ {
-				in.yNew[stg][id] += p.b[stg][ic] * in.yOld[ic][id]
+	var j_stg, k_stg, i_n uint
+	// Loops: StA, StB
+
+	/*@; BEGIN(StB=Nest) @*/
+	for i_n = 0; i_n < in.n; i_n++ {
+		for j_stg = 0; j_stg < p.Stages; j_stg++ {
+			// Init once
+			in.yNew[j_stg][i_n] = 0.0
+
+			// Accumulation (Reduction) -> parallelization?
+			for k_stg = 0; k_stg < p.Stages; k_stg++ {
+				in.yNew[j_stg][i_n] += p.b[j_stg][k_stg] * in.yOld[k_stg][i_n]
 			}
 		}
 	}
 
-	for id = 0; id < in.n; id++ {
-		for stg = 0; stg < p.Stages; stg++ {
-			for ic = 0; ic < p.Stages; ic++ {
-				in.yNew[stg][id] += in.pa[stg][ic] * in.fOld[ic][id]
+	/*@; BEGIN(StA=Nest) @*/
+	for i_n = 0; i_n < in.n; i_n++ {
+		for j_stg = 0; j_stg < p.Stages; j_stg++ {
+
+			// Accumulation (Reduction) -> parallelization?
+			for k_stg = 0; k_stg < p.Stages; k_stg++ {
+				in.yNew[j_stg][i_n] += in.pa[j_stg][k_stg] * in.fOld[k_stg][i_n]
 			}
 		}
 	}
@@ -281,22 +288,24 @@ func (p *peer) computeEvaluations(in *integration) {
 	in.EvaluationCount += p.Stages
 }
 
+// Computes the error estimate based on fNew:
 func (p *peer) computeErrorModel(in *integration) (errorEstimate float64) {
-	var id, stg uint
-	// compute error estimate with fNew:
-	for id = 0; id < in.n; id++ {
-		var rc float64 = 0.0
-		for stg = 0; stg < p.Stages; stg++ {
-			rc += p.errorModelWeights[stg] * in.fNew[stg][id]
+	var i_n, j_stg uint
+
+	// Loop: EmFactors
+	for i_n = 0; i_n < in.n; i_n++ {
+		var factor float64 = 0.0
+		for j_stg = 0; j_stg < p.Stages; j_stg++ {
+			factor += p.errorModelWeights[j_stg] * in.fNew[j_stg][i_n]
 		}
-		in.errorFactors[id] = math.Pow(rc/(in.AbsoluteTolerance+in.RelativeTolerance*math.Abs(in.yOld[p.Stages-1][id])), 2.0)
+		in.errorFactors[i_n] = math.Pow(factor/(in.AbsoluteTolerance+in.RelativeTolerance*math.Abs(in.yOld[p.Stages-1][i_n])), 2.0)
 	}
 
 	// compute error quotient/20070803
 	// step ratio from error model ((1+a)^p-a^p)/est+a^p)^(1/p)-a, p=order/2:
 	errorRelative := 0.0
-	for id = 0; id < in.n; id++ {
-		errorRelative += in.errorFactors[id]
+	for i_n = 0; i_n < in.n; i_n++ {
+		errorRelative += in.errorFactors[i_n]
 	}
 
 	errorEstimate = in.stepEstimate*math.Sqrt(errorRelative/float64(in.n)) + 1e-8
