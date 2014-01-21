@@ -1,6 +1,7 @@
 package problems
 
 import "math"
+import "fmt"
 
 const meps = 1e-4
 
@@ -21,6 +22,10 @@ func NewMBody(n uint) (p Problem) {
 	}
 
 	return &m
+}
+
+func (m *mbody) Description() string {
+	return fmt.Sprintf("MBody with %i bodies", len(m.mass))
 }
 
 func (m *mbody) Initialize() (y0 []float64) {

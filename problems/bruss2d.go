@@ -1,6 +1,7 @@
 package problems
 
 import "github.com/rollingthunder/differential/util"
+import "fmt"
 
 type brusselator struct {
 	// Reaction Constants A and B
@@ -24,6 +25,10 @@ func v0(x, y float64) float64 {
 
 func u0(x, y float64) float64 {
 	return 2 + 0.25*y
+}
+
+func (b *brusselator) Description() string {
+	return fmt.Sprintf("Brusselator2D with %d x %d cells", b.n, b.n)
 }
 
 func (b *brusselator) Initialize() (grid []float64) {
@@ -84,14 +89,14 @@ func (b *brusselator) FcnCorrect(t float64, yT []float64, dy_out []float64) {
 // alpha = 0.002
 // u[0, x, y] = 2 + 0.25y
 // v(0, x, y) = 1 + 0.8x
-func NewBruss2D(N int) TiledProblem {
+func NewBruss2D(N uint) TiledProblem {
 	if N <= 0 {
 		return nil
 	}
 
 	var b brusselator
-	b.a, b.b, b.n = 3.4, 1.0, N
-	b.cellcount = N * N
+	b.a, b.b, b.n = 3.4, 1.0, int(N)
+	b.cellcount = int(N * N)
 	b.alpha = 0.002
 	n1 := float64(N) - 1.0
 	b.a1, b.alphaN1Squared = b.a+1.0, b.alpha*n1*n1

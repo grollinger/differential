@@ -40,6 +40,8 @@ type integration struct {
 	n                                                                          uint
 }
 
+type computationStep func(*peer, *integration)
+
 func (p *peer) Integrate(t, tEnd float64, yT []float64, cfg *Config) (s Statistics, err error) {
 	err = cfg.ValidateAndPrepare(uint(len(yT)))
 
@@ -267,6 +269,46 @@ func (p *peer) computeStages(in *integration) {
 
 			// Accumulation (Reduction) -> parallelization?
 			for k_stg = 0; k_stg < p.Stages; k_stg++ {
+				in.yNew[j_stg][i_n] += in.pa[j_stg][k_stg] * in.fOld[k_stg][i_n]
+			}
+		}
+	}
+}
+
+func (p *peer) computeStages_FuseAB(in *integration) {
+	// STAGE SOLUTIONS -> "St" Prefix
+	var j_stg, k_stg, i_n uint
+	// Loops: StA, StB
+
+	/*@; BEGIN(StB=Nest) @*/
+	for i_n = 0; i_n < in.n; i_n++ {
+		for j_stg = 0; j_stg < p.Stages; j_stg++ {
+			// Init once
+			in.yNew[j_stg][i_n] = 0.0
+
+			// Accumulation (Reduction) -> parallelization?
+			for k_stg = 0; k_stg < p.Stages; k_stg++ {
+				in.yNew[j_stg][i_n] += p.b[j_stg][k_stg] * in.yOld[k_stg][i_n]
+				in.yNew[j_stg][i_n] += in.pa[j_stg][k_stg] * in.fOld[k_stg][i_n]
+			}
+		}
+	}
+}
+
+func (p *peer) computeStages_FuseAB_ExchangeIJ(in *integration) {
+	// STAGE SOLUTIONS -> "St" Prefix
+	var j_stg, k_stg, i_n uint
+	// Loops: StA, StB
+
+	/*@; BEGIN(StB=Nest) @*/
+	for j_stg = 0; j_stg < p.Stages; j_stg++ {
+		for i_n = 0; i_n < in.n; i_n++ {
+			// Init once
+			in.yNew[j_stg][i_n] = 0.0
+
+			// Accumulation (Reduction) -> parallelization?
+			for k_stg = 0; k_stg < p.Stages; k_stg++ {
+				in.yNew[j_stg][i_n] += p.b[j_stg][k_stg] * in.yOld[k_stg][i_n]
 				in.yNew[j_stg][i_n] += in.pa[j_stg][k_stg] * in.fOld[k_stg][i_n]
 			}
 		}

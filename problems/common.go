@@ -8,6 +8,7 @@
 package problems
 
 type Problem interface {
+	Description() string
 	Initialize() []float64
 	Fcn(t float64, yT []float64, dy_out []float64)
 }

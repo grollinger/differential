@@ -2,7 +2,7 @@ package problems
 
 import "testing"
 
-var benchmarkSystemSize int = 30
+var benchmarkSystemSize uint = 30
 var benchmarkT float64 = 0.0
 
 func setupBenchmark() (b *brusselator, instance, out []float64) {
