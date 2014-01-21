@@ -26,9 +26,19 @@ var tables = []Table{
 	},
 }
 
-func TestTable(t *testing.T) {
+func TestTableHTML(t *testing.T) {
 	var b bytes.Buffer
 	err := writeTablesHTML(tables, &b)
+	if err != nil {
+		t.Fatalf("error writing html %q", err)
+	}
+
+	t.Log(b.String())
+}
+
+func TestTableCSV(t *testing.T) {
+	var b bytes.Buffer
+	err := writeTablesCSV(tables, &b)
 	if err != nil {
 		t.Fatalf("error writing html %q", err)
 	}
@@ -40,7 +50,7 @@ func TestTablesFile(t *testing.T) {
 	var fileName = "testTables.html"
 	defer os.Remove("testTables.html")
 
-	WriteTablesFile(tables, fileName)
+	WriteTablesHTML(tables, fileName)
 
 	if file, err := os.OpenFile(fileName, os.O_RDONLY, os.ModePerm); err == nil {
 		defer file.Close()

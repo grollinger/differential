@@ -15,7 +15,7 @@ type Table struct {
 	Data                   map[string][][]float64
 }
 
-func WriteTablesFile(tables []Table, filePath string) (err error) {
+func WriteTablesHTML(tables []Table, filePath string) (err error) {
 	file, err := os.Create(filePath)
 	if err != nil {
 		log.Println("opening file:", err)
@@ -24,6 +24,17 @@ func WriteTablesFile(tables []Table, filePath string) (err error) {
 	defer file.Close()
 
 	return writeTablesHTML(tables, file)
+}
+
+func WriteTablesCSV(tables []Table, filePath string) (err error) {
+	file, err := os.Create(filePath)
+	if err != nil {
+		log.Println("opening file:", err)
+		return
+	}
+	defer file.Close()
+
+	return writeTablesCSV(tables, file)
 }
 
 func tableSanityCheck(table *Table) error {
@@ -119,6 +130,31 @@ func writeTablesHTML(tables []Table, output io.Writer) (err error) {
 		"mod": func(a, b int) int { return a % b },
 	}
 	tDocument := template.Must(template.New("document").Funcs(funcMap).Parse(document))
+
+	err = tDocument.Execute(output, tables)
+	if err != nil {
+		log.Println("executing template:", err)
+	}
+
+	return
+}
+
+func writeTablesCSV(tables []Table, output io.Writer) (err error) {
+	for t := range tables {
+		err = tableSanityCheck(&tables[t])
+		if err != nil {
+			return
+		}
+	}
+
+	// Define a template.
+	const csv = `
+{{range $table := .}}DataSet; RowHeader; {{range $table.ColHeaders}}{{.}};{{end}}
+{{range $dataTitle, $data := $table.Data}}{{range $index, $element := $data}}{{$table.Title}} - {{$dataTitle}}; {{index $table.RowHeaders $index}}; {{range $element}}{{.}};{{end}}
+{{end}}{{end}}{{end}}
+`
+
+	tDocument := template.Must(template.New("document").Parse(csv))
 
 	err = tDocument.Execute(output, tables)
 	if err != nil {
