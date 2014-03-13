@@ -253,6 +253,7 @@ func (p *peer) computeStages(in *integration) {
 	// StB Nest
 	for i_n = 0; i_n < in.n; i_n++ {
 		for j_stg = 0; j_stg < p.Stages; j_stg++ {
+			// Init once
 			in.yNew[j_stg][i_n] = 0.0
 			for k_stg = 0; k_stg < p.Stages; k_stg++ {
 				in.yNew[j_stg][i_n] += p.b[j_stg][k_stg] * in.yOld[k_stg][i_n]
